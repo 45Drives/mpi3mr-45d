@@ -1,3 +1,18 @@
+diff --git a/mpi3mr.h b/mpi3mr.h
+index eb44fba..90e2f13 100755
+--- a/mpi3mr.h
++++ b/mpi3mr.h
+@@ -67,8 +67,8 @@ extern spinlock_t mrioc_list_lock;
+ extern struct list_head mrioc_list;
+ extern atomic64_t event_counter;
+ 
+-#define MPI3MR_DRIVER_VERSION	"8.5.1.0.0"
+-#define MPI3MR_DRIVER_RELDATE	"21-April-2023"
++#define MPI3MR_DRIVER_VERSION	"8.5.1.0.0-45d"
++#define MPI3MR_DRIVER_RELDATE	"8-August-2023"
+ 
+ #define MPI3MR_DRIVER_NAME	"mpi3mr"
+ #define MPI3MR_DRIVER_LICENSE	"GPL"
 diff --git a/mpi3mr_app.c b/mpi3mr_app.c
 index afdd634..77807ed 100755
 --- a/mpi3mr_app.c
