@@ -3,7 +3,7 @@
     "name": "mpi3mr-45d",
     "title": "mpi3mr-45d",
     "prerelease": true,
-    "version": "8.5.1.0.0-45d",
+    "version": "8.5.1.0.0",
     "buildVersion": "1",
     "author": "Joshua Boudreau <jboudreau@45drives.com>",
     "url": "https://github.com/45Drives/mpi3mr-45d",
