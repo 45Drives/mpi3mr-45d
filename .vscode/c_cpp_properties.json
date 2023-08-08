@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "Linux 5.4",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/include",
+                "/usr/local/include",
+                "/usr/lib/modules/5.4.250-1-MANJARO/build/include",
+                "/usr/lib/modules/5.4.250-1-MANJARO/build/arch/x86/include",
+                "/usr/lib/modules/5.4.250-1-MANJARO/build/arch/x86/include/generated",
+                "/usr/lib/gcc/x86_64-pc-linux-gnu/13.1.1/include"
+            ],
+            "defines": [
+                "__GNUC__",
+                "__KERNEL__"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}
