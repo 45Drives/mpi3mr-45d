@@ -24,7 +24,6 @@ FILES=(
     mpi/mpi30_targ.h
     dkms.conf
     mpi3mr_fw.c
-    45drives.patch
     mpi3mr_app.c
     mpi3mr_debug.h
     mpi3mr_debugfs.c
