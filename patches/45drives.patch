@@ -14,7 +14,7 @@ index eb44fba..90e2f13 100755
  #define MPI3MR_DRIVER_NAME	"mpi3mr"
  #define MPI3MR_DRIVER_LICENSE	"GPL"
 diff --git a/mpi3mr_app.c b/mpi3mr_app.c
-index afdd634..77807ed 100755
+index afdd634..e9f0935 100755
 --- a/mpi3mr_app.c
 +++ b/mpi3mr_app.c
 @@ -3675,12 +3675,79 @@ persistent_id_show(struct device *dev, struct device_attribute *attr,
@@ -82,7 +82,7 @@ index afdd634..77807ed 100755
 +	tgtdev = tgt_priv_data->tgt_dev;
 +	if (!tgtdev)
 +		return 0;
-+	return snprintf(buf, PAGE_SIZE, "%lu\n", tgtdev->enclosure_logical_id);
++	return snprintf(buf, PAGE_SIZE, "%lu\n", tgtdev->encl_handle);
 +}
 +static DEVICE_ATTR_RO(enclosure);
 +
