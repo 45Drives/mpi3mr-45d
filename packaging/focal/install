@@ -33,5 +33,6 @@ FILES=(
 )
 
 for FILE in "${FILES[@]}"; do
-    echo "$FILE" "/usr/src/$PACKAGE_NAME-$PACKAGE_VERSION"
+    DIR=$(dirname "$FILE")
+    echo "$FILE" "/usr/src/$PACKAGE_NAME-$PACKAGE_VERSION/$DIR"
 done
