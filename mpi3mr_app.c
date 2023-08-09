@@ -3709,7 +3709,7 @@ static DEVICE_ATTR_RO(slot);
 
 
 /**
- * enclosure_show - SysFS callback for enclosure logical ID display
+ * encl_handle_show - SysFS callback for enclosure logical ID display
  * @dev: class device
  * @attr: Device attributes
  * @buf: Buffer to copy
@@ -3718,7 +3718,7 @@ static DEVICE_ATTR_RO(slot);
  * of the specific device.
  */
 static ssize_t
-enclosure_show(struct device *dev, struct device_attribute *attr,
+encl_handle_show(struct device *dev, struct device_attribute *attr,
 			char *buf)
 {
 	struct scsi_device *sdev = to_scsi_device(dev);
@@ -3738,7 +3738,7 @@ enclosure_show(struct device *dev, struct device_attribute *attr,
 		return 0;
 	return snprintf(buf, PAGE_SIZE, "%lu\n", tgtdev->encl_handle);
 }
-static DEVICE_ATTR_RO(enclosure);
+static DEVICE_ATTR_RO(encl_handle);
 
 #if (KERNEL_VERSION(5, 16, 0) > LINUX_VERSION_CODE)
 struct device_attribute *mpi3mr_dev_attrs[] = {
@@ -3747,7 +3747,7 @@ struct device_attribute *mpi3mr_dev_attrs[] = {
 	&dev_attr_device_handle,
 	&dev_attr_persistent_id,
 	&dev_attr_slot,
-	&dev_attr_enclosure,
+	&dev_attr_encl_handle,
 	NULL,
 };
 #else
@@ -3757,7 +3757,7 @@ static struct attribute *mpi3mr_dev_attrs[] = {
 	&dev_attr_device_handle.attr,
 	&dev_attr_persistent_id.attr,
 	&dev_attr_slot.attr,
-	&dev_attr_enclosure.attr,
+	&dev_attr_encl_handle.attr,
 	NULL,
 };
 
