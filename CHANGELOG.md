@@ -1,3 +1,3 @@
-## mpi3mr-45d 8.5.1.0.0-45d-1
+## mpi3mr 8.5.1.0.0-1_45d
 
 * First build

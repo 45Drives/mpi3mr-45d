@@ -41,5 +41,5 @@ exit 0
 exit 0
 
 %changelog
-* Tue Aug 08 2023 Joshua Boudreau <jboudreau@45drives.com> 8.5.1.0.0-45d-1
+* Wed Aug 09 2023 Joshua Boudreau <jboudreau@45drives.com> 8.5.1.0.0-1_45d
 - First build
