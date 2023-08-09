@@ -1,5 +1,5 @@
-mpi3mr-dkms (8.5.1.0.0-1_45dfocal) focal; urgency=medium
+mpi3mr-dkms (8.5.1.0.0-1-45dfocal) focal; urgency=medium
 
   * First build
 
- -- Joshua Boudreau <jboudreau@45drives.com>  Wed, 09 Aug 2023 09:05:41 -0300
+ -- Joshua Boudreau <jboudreau@45drives.com>  Wed, 09 Aug 2023 09:08:13 -0300
