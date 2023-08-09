@@ -3736,7 +3736,7 @@ enclosure_show(struct device *dev, struct device_attribute *attr,
 	tgtdev = tgt_priv_data->tgt_dev;
 	if (!tgtdev)
 		return 0;
-	return snprintf(buf, PAGE_SIZE, "%lu\n", tgtdev->enclosure_logical_id);
+	return snprintf(buf, PAGE_SIZE, "%lu\n", tgtdev->encl_handle);
 }
 static DEVICE_ATTR_RO(enclosure);
 
