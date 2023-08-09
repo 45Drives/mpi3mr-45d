@@ -14,7 +14,7 @@ index eb44fba..90e2f13 100755
  #define MPI3MR_DRIVER_NAME	"mpi3mr"
  #define MPI3MR_DRIVER_LICENSE	"GPL"
 diff --git a/mpi3mr_app.c b/mpi3mr_app.c
-index afdd634..e9f0935 100755
+index afdd634..f0349f6 100755
 --- a/mpi3mr_app.c
 +++ b/mpi3mr_app.c
 @@ -3675,12 +3675,79 @@ persistent_id_show(struct device *dev, struct device_attribute *attr,
@@ -55,7 +55,7 @@ index afdd634..e9f0935 100755
 +
 +
 +/**
-+ * enclosure_show - SysFS callback for enclosure logical ID display
++ * encl_handle_show - SysFS callback for enclosure logical ID display
 + * @dev: class device
 + * @attr: Device attributes
 + * @buf: Buffer to copy
@@ -64,7 +64,7 @@ index afdd634..e9f0935 100755
 + * of the specific device.
 + */
 +static ssize_t
-+enclosure_show(struct device *dev, struct device_attribute *attr,
++encl_handle_show(struct device *dev, struct device_attribute *attr,
 +			char *buf)
 +{
 +	struct scsi_device *sdev = to_scsi_device(dev);
@@ -84,7 +84,7 @@ index afdd634..e9f0935 100755
 +		return 0;
 +	return snprintf(buf, PAGE_SIZE, "%lu\n", tgtdev->encl_handle);
 +}
-+static DEVICE_ATTR_RO(enclosure);
++static DEVICE_ATTR_RO(encl_handle);
 +
  #if (KERNEL_VERSION(5, 16, 0) > LINUX_VERSION_CODE)
  struct device_attribute *mpi3mr_dev_attrs[] = {
@@ -93,7 +93,7 @@ index afdd634..e9f0935 100755
  	&dev_attr_device_handle,
  	&dev_attr_persistent_id,
 +	&dev_attr_slot,
-+	&dev_attr_enclosure,
++	&dev_attr_encl_handle,
  	NULL,
  };
  #else
@@ -102,7 +102,7 @@ index afdd634..e9f0935 100755
  	&dev_attr_device_handle.attr,
  	&dev_attr_persistent_id.attr,
 +	&dev_attr_slot.attr,
-+	&dev_attr_enclosure.attr,
++	&dev_attr_encl_handle.attr,
  	NULL,
  };
  
