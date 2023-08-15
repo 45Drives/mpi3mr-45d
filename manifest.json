@@ -23,16 +23,15 @@
     },
     "dependencies": {
         "deb": {
-            "bionic": [
-                "dkms"
-            ],
             "focal": [
-                "dkms"
+                "dkms",
+                "patch"
             ]
         },
         "el": {
             "el8": [
-                "dkms"
+                "dkms",
+                "patch"
             ]
         }
     },
