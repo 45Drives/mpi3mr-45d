@@ -29,15 +29,15 @@ rm -rf %{buildroot}
 
 %files
 %defattr(0644,root,root)
-%attr(0755,root,root) /usr/src/%{name}-%{version}/
+%attr(0755,root,root) /usr/src/mpi3mr-%{version}/
 
 %post
-/usr/sbin/dkms add -m %{name} -v %{version}
-/usr/sbin/dkms build -m %{name} -v %{version} && /usr/sbin/dkms install -m %{name} -v %{version}
+/usr/sbin/dkms add -m mpi3mr -v %{version}
+/usr/sbin/dkms build -m mpi3mr -v %{version} && /usr/sbin/dkms install -m mpi3mr -v %{version}
 exit 0
 
 %preun
-/usr/sbin/dkms remove -m %{name} -v %{version} --all
+/usr/sbin/dkms remove -m mpi3mr -v %{version} --all
 exit 0
 
 %changelog
