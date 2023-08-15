@@ -1,3 +1,3 @@
-## mpi3mr 8.5.1.0.0-45d1
+## mpi3mr 8.5.1.0.0-45d2
 
-* First build
+* fixed installed path for rocky

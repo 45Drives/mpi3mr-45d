@@ -41,5 +41,7 @@ exit 0
 exit 0
 
 %changelog
+* Tue Aug 15 2023 Joshua Boudreau <jboudreau@45drives.com> 8.5.1.0.0-45d2
+- fixed installed path for rocky
 * Wed Aug 09 2023 Joshua Boudreau <jboudreau@45drives.com> 8.5.1.0.0-45d1
 - First build
