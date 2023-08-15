@@ -23,6 +23,8 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 %build
 
 %install
+echo PACKAGE_NAME=%{PACKAGE_NAME}
+echo PACKAGE_VERSION=%{PACKAGE_VERSION}
 rm -rf %{buildroot}
 mkdir -p %{buildroot}/usr/src/%{PACKAGE_NAME}-%{PACKAGE_VERSION}/
 cp -r * %{buildroot}/usr/src/%{PACKAGE_NAME}-%{PACKAGE_VERSION}
