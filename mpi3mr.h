@@ -51,6 +51,11 @@
 #include <scsi/scsi_dbg.h>
 #include <scsi/scsi_transport_sas.h>
 
+#ifndef SCSI_VPD_PG_LEN
+// No idea why, but Rocky 8's version of kernel 4.18.0 does not define this in scsi/scsi_device.h
+#define SCSI_VPD_PG_LEN 255
+#endif
+
 #include "mpi/mpi30_transport.h"
 #include "mpi/mpi30_cnfg.h"
 #include "mpi/mpi30_image.h"
