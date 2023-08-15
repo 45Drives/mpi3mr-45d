@@ -21,8 +21,8 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %install
 rm -rf %{buildroot}
-mkdir -p %{buildroot}/usr/src/%{name}-%{version}/
-cp -r * %{buildroot}/usr/src/%{name}-%{version}
+mkdir -p %{buildroot}/usr/src/mpi3mr-%{version}/
+cp -r * %{buildroot}/usr/src/mpi3mr-%{version}
 
 %clean
 rm -rf %{buildroot}
