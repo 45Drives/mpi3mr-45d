@@ -10,8 +10,8 @@ Requires: ::package_dependencies_el_el8::
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
-%global PACKAGE_NAME %(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2)
-%global PACKAGE_VERSION %(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2)
+%global PACKAGE_NAME mpi3mr
+%global PACKAGE_VERSION 8.5.1.0.0-45d
 
 %description
 ::package_title::
@@ -23,23 +23,25 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 %build
 
 %install
+echo PACKAGE_NAME=%{PACKAGE_NAME}
+echo PACKAGE_VERSION=%{PACKAGE_VERSION}
 rm -rf %{buildroot}
-mkdir -p %{buildroot}/usr/src/%(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2)-%(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2)/
-cp -r * %{buildroot}/usr/src/%(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2)-%(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2)
+mkdir -p %{buildroot}/usr/src/%{PACKAGE_NAME}-%{PACKAGE_VERSION}/
+cp -r * %{buildroot}/usr/src/%{PACKAGE_NAME}-%{PACKAGE_VERSION}
 
 %clean
 rm -rf %{buildroot}
 
 %files
 %defattr(0644,root,root)
-%attr(0755,root,root) /usr/src/%(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2)-%(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2)/
+%attr(0755,root,root) /usr/src/%{PACKAGE_NAME}-%{PACKAGE_VERSION}/
 
 %post
-/usr/sbin/dkms add -m %(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2) -v %(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2)
-/usr/sbin/dkms build -m %(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2) -v %(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2) && /usr/sbin/dkms install -m %(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2) -v %(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2)
+/usr/sbin/dkms add -m %{PACKAGE_NAME} -v %{PACKAGE_VERSION}
+/usr/sbin/dkms build -m %{PACKAGE_NAME} -v %{PACKAGE_VERSION} && /usr/sbin/dkms install -m %{PACKAGE_NAME} -v %{PACKAGE_VERSION}
 
 %preun
-/usr/sbin/dkms remove -m %(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2) -v %(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2) --all
+/usr/sbin/dkms remove -m %{PACKAGE_NAME} -v %{PACKAGE_VERSION} --all
 exit 0
 
 %changelog
