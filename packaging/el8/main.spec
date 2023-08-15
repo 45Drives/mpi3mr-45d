@@ -16,28 +16,30 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %prep
 %setup -q
+PACKAGE_NAME=$(shell grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2)
+PACKAGE_VERSION=$(shell grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2)
+export PACKAGE_NAME PACKAGE_VERSION
 
 %build
 
 %install
 rm -rf %{buildroot}
-mkdir -p %{buildroot}/usr/src/mpi3mr-%{version}/
-cp -r * %{buildroot}/usr/src/mpi3mr-%{version}
+mkdir -p %{buildroot}/usr/src/${PACKAGE_NAME}-%{PACKAGE_VERSION}/
+cp -r * %{buildroot}/usr/src/${PACKAGE_NAME}-%{PACKAGE_VERSION}
 
 %clean
 rm -rf %{buildroot}
 
 %files
 %defattr(0644,root,root)
-%attr(0755,root,root) /usr/src/mpi3mr-%{version}/
+%attr(0755,root,root) /usr/src/${PACKAGE_NAME}-%{PACKAGE_VERSION}/
 
 %post
-/usr/sbin/dkms add -m mpi3mr -v %{version}
-/usr/sbin/dkms build -m mpi3mr -v %{version} && /usr/sbin/dkms install -m mpi3mr -v %{version}
-exit 0
+/usr/sbin/dkms add -m ${PACKAGE_NAME} -v %{PACKAGE_VERSION}
+/usr/sbin/dkms build -m ${PACKAGE_NAME} -v %{PACKAGE_VERSION} && /usr/sbin/dkms install -m ${PACKAGE_NAME} -v %{PACKAGE_VERSION}
 
 %preun
-/usr/sbin/dkms remove -m mpi3mr -v %{version} --all
+/usr/sbin/dkms remove -m ${PACKAGE_NAME} -v %{PACKAGE_VERSION} --all
 exit 0
 
 %changelog
