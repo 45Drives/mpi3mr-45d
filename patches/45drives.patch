@@ -1,8 +1,20 @@
 diff --git a/mpi3mr.h b/mpi3mr.h
-index eb44fba..42fbe37 100755
+index eb44fba..22f9dc4 100755
 --- a/mpi3mr.h
 +++ b/mpi3mr.h
-@@ -67,7 +67,7 @@ extern spinlock_t mrioc_list_lock;
+@@ -51,6 +51,11 @@
+ #include <scsi/scsi_dbg.h>
+ #include <scsi/scsi_transport_sas.h>
+ 
++#ifndef SCSI_VPD_PG_LEN
++// No idea why, but Rocky 8's version of kernel 4.18.0 does not define this in scsi/scsi_device.h
++#define SCSI_VPD_PG_LEN 255
++#endif
++
+ #include "mpi/mpi30_transport.h"
+ #include "mpi/mpi30_cnfg.h"
+ #include "mpi/mpi30_image.h"
+@@ -67,7 +72,7 @@ extern spinlock_t mrioc_list_lock;
  extern struct list_head mrioc_list;
  extern atomic64_t event_counter;
  
