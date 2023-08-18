@@ -1,5 +1,5 @@
 diff --git a/mpi3mr.h b/mpi3mr.h
-index eb44fba..22f9dc4 100755
+index 900dcab..da3ce95 100755
 --- a/mpi3mr.h
 +++ b/mpi3mr.h
 @@ -51,6 +51,11 @@
@@ -18,16 +18,16 @@ index eb44fba..22f9dc4 100755
  extern struct list_head mrioc_list;
  extern atomic64_t event_counter;
  
--#define MPI3MR_DRIVER_VERSION	"8.5.1.0.0"
-+#define MPI3MR_DRIVER_VERSION	"8.5.1.0.0-45d"
- #define MPI3MR_DRIVER_RELDATE	"21-April-2023"
+-#define MPI3MR_DRIVER_VERSION	"8.6.1.0.0"
++#define MPI3MR_DRIVER_VERSION	"8.6.1.0.0-45d"
+ #define MPI3MR_DRIVER_RELDATE	"14-July-2023"
  
  #define MPI3MR_DRIVER_NAME	"mpi3mr"
 diff --git a/mpi3mr_app.c b/mpi3mr_app.c
-index afdd634..01ea53a 100755
+index 1e69b8f..cf57e2e 100755
 --- a/mpi3mr_app.c
 +++ b/mpi3mr_app.c
-@@ -3675,12 +3675,45 @@ persistent_id_show(struct device *dev, struct device_attribute *attr,
+@@ -3708,12 +3708,45 @@ persistent_id_show(struct device *dev, struct device_attribute *attr,
  }
  static DEVICE_ATTR_RO(persistent_id);
  
@@ -73,7 +73,7 @@ index afdd634..01ea53a 100755
  	NULL,
  };
  #else
-@@ -3689,6 +3722,7 @@ static struct attribute *mpi3mr_dev_attrs[] = {
+@@ -3722,6 +3755,7 @@ static struct attribute *mpi3mr_dev_attrs[] = {
  	&dev_attr_sas_address.attr,
  	&dev_attr_device_handle.attr,
  	&dev_attr_persistent_id.attr,
@@ -81,7 +81,7 @@ index afdd634..01ea53a 100755
  	NULL,
  };
  
-@@ -3701,4 +3735,3 @@ const struct attribute_group *mpi3mr_dev_groups[] = {
+@@ -3734,4 +3768,3 @@ const struct attribute_group *mpi3mr_dev_groups[] = {
  	NULL,
  };
  #endif
