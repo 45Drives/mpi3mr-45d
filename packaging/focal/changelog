@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.6.1.0.0-45d1focal) focal; urgency=medium
+
+  * Updated upstream to 8.6.1.0.0
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 18 Aug 2023 14:05:07 -0300
+
 mpi3mr-dkms (8.5.1.0.0-45d2focal) focal; urgency=medium
 
   * fixed installed path for rocky

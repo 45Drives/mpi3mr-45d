@@ -1,3 +1,3 @@
-## mpi3mr 8.5.1.0.0-45d2
+## mpi3mr 8.6.1.0.0-45d1
 
-* fixed installed path for rocky
+* Updated upstream to 8.6.1.0.0
