@@ -218,6 +218,10 @@ struct mpi3_encrypted_hash_entry {
 #define MPI3_ENCRYPTION_ALGORITHM_RSA2048            (0x04)
 #define MPI3_ENCRYPTION_ALGORITHM_RSA4096            (0x05)
 #define MPI3_ENCRYPTION_ALGORITHM_RSA3072            (0x06)
+#define MPI3_ENCRYPTION_ALGORITHM_ECDSA_P256         (0x07)
+#define MPI3_ENCRYPTION_ALGORITHM_ECDSA_P384         (0x08)
+#define MPI3_ENCRYPTION_ALGORITHM_ECDSA_P521         (0x09)
+
 #ifndef MPI3_PUBLIC_KEY_MAX
 #define MPI3_PUBLIC_KEY_MAX                          (1)
 #endif

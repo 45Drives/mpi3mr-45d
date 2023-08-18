@@ -67,8 +67,8 @@ extern spinlock_t mrioc_list_lock;
 extern struct list_head mrioc_list;
 extern atomic64_t event_counter;
 
-#define MPI3MR_DRIVER_VERSION	"8.5.1.0.0"
-#define MPI3MR_DRIVER_RELDATE	"21-April-2023"
+#define MPI3MR_DRIVER_VERSION	"8.6.1.0.0"
+#define MPI3MR_DRIVER_RELDATE	"14-July-2023"
 
 #define MPI3MR_DRIVER_NAME	"mpi3mr"
 #define MPI3MR_DRIVER_LICENSE	"GPL"
@@ -176,6 +176,7 @@ extern atomic64_t event_counter;
 /* Controller Reset related definitions */
 #define MPI3MR_HOSTDIAG_UNLOCK_RETRY_COUNT	5
 #define MPI3MR_MAX_RESET_RETRY_COUNT		3
+#define MPI3MR_MAX_SHUTDOWN_RETRY_COUNT		2
 
 #define MPI3MR_RI_MASK_RESPCODE		(0x000000FF)
 
@@ -653,6 +654,18 @@ struct tgt_dev_sas_sata {
 };
 
 /**
+ * union mpi3mr_trigger_data - Trigger data information
+ * @fault: Fault code
+ * @global: Global trigger data
+ * @element: element trigger data
+ */
+union mpi3mr_trigger_data{
+	u16 fault;
+	u64 global;
+	union mpi3_driver2_trigger_element element;
+};
+
+/**
  * struct trigger_event_data - store trigger related
  * information.
  *
@@ -666,7 +679,7 @@ struct trigger_event_data {
 	struct diag_buffer_desc *trace_hdb;
 	struct diag_buffer_desc *fw_hdb;
 	u8 trigger_type;
-	u64 trigger_specific_data;
+	union mpi3mr_trigger_data trigger_specific_data;
 	bool snapdump;
 };
 
@@ -947,7 +960,7 @@ struct scmd_priv {
  */
 struct diag_buffer_desc {
 	u8 type;
-	u64 trigger_data;
+	union mpi3mr_trigger_data trigger_data;
 	u8 trigger_type;
 	u8 status;
 	u32 size;
@@ -970,6 +983,28 @@ struct dma_memory_desc {
 	dma_addr_t dma_addr;
 };
 
+/**
+ * struct mpi3mr_pdevinfo - PCI device information
+ *
+ * @dev_id: PCI device ID of the adapter
+ * @dev_hw_rev: PCI revision of the adapter
+ * @subsys_dev_id: PCI subsystem device ID of the adapter
+ * @subsys_ven_id: PCI subsystem vendor ID of the adapter
+ * @dev: PCI device
+ * @func: PCI function
+ * @bus: PCI bus
+ * @seg_id: PCI segment ID
+ */
+struct mpi3mr_pdevinfo {
+	u16 id;
+	u16 ssid;
+	u16 ssvid;
+	u16 segment;
+	u8 dev:5;
+	u8 func:3;
+	u8 bus;
+	u8 revision;
+};
 
 /**
  * struct mpi3mr_ioc - Adapter anchor structure stored in shost
@@ -1157,6 +1192,9 @@ struct dma_memory_desc {
  * @ioctl_chain_sge: DMA buffer descriptor for IOCTL chain
  * @ioctl_resp_sge: DMA buffer descriptor for Mgmt cmd response
  * @ioctl_sges_allocated: Flag for IOCTL SGEs allocated or not
+ * @pcie_err_recovery: PCIe error recovery in progress
+ * @block_on_pcie_err: Block IO during PCI error recovery
+ * @pdevinfo: PCI device information
  */
 struct mpi3mr_ioc {
 	struct list_head list;
@@ -1395,6 +1433,10 @@ struct mpi3mr_ioc {
 	struct dma_memory_desc ioctl_chain_sge;
 	struct dma_memory_desc ioctl_resp_sge;
 	bool ioctl_sges_allocated;
+
+	bool pcie_err_recovery;
+	bool block_on_pcie_err;
+	struct mpi3mr_pdevinfo pdevinfo;
 };
 
 int mpi3mr_setup_resources(struct mpi3mr_ioc *mrioc);
@@ -1560,9 +1602,9 @@ void mpi3mr_free_enclosure_list(struct mpi3mr_ioc *mrioc);
 void mpi3mr_flush_drv_cmds(struct mpi3mr_ioc *mrioc);
 void mpi3mr_flush_cmds_for_unrecovered_controller(struct mpi3mr_ioc *mrioc);
 void mpi3mr_set_trigger_data_in_hdb(struct diag_buffer_desc *hdb,
-	u8 type, u64 data, bool force);
+	u8 type, union mpi3mr_trigger_data *trigger_data, bool force);
 void mpi3mr_set_trigger_data_in_all_hdb(struct mpi3mr_ioc *mrioc,
-	u8 type, u64 data, bool force);
+	u8 type, union mpi3mr_trigger_data *trigger_data, bool force);
 int mpi3mr_process_admin_reply_q(struct mpi3mr_ioc *mrioc);
 void mpi3mr_print_discard_event_notice(struct mpi3mr_ioc *mrioc,
 	bool device_add);

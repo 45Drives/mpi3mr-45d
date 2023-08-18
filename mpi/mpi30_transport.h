@@ -16,7 +16,7 @@ union mpi3_version_union {
 };
 #define MPI3_VERSION_MAJOR                                              (3)
 #define MPI3_VERSION_MINOR                                              (0)
-#define MPI3_VERSION_UNIT                                               (28)
+#define MPI3_VERSION_UNIT                                               (29)
 #define MPI3_VERSION_DEV                                                (0)
 #define MPI3_DEVHANDLE_INVALID                                          (0xffff)
 struct mpi3_sysif_oper_queue_indexes {
@@ -143,9 +143,6 @@ struct mpi3_sysif_registers {
 #define MPI3_SYSIF_HOST_DIAG_DIAG_RW_ENABLE                             (0x00000002)
 #define MPI3_SYSIF_HOST_DIAG_DIAG_WRITE_ENABLE                          (0x00000001)
 #define MPI3_SYSIF_FAULT_OFFSET                                         (0x00001c10)
-#define MPI3_SYSIF_FAULT_FUNC_AREA_MASK                                 (0xff000000)
-#define MPI3_SYSIF_FAULT_FUNC_AREA_SHIFT                                (24)
-#define MPI3_SYSIF_FAULT_FUNC_AREA_MPI_DEFINED                          (0x00000000)
 #define MPI3_SYSIF_FAULT_CODE_MASK                                      (0x0000ffff)
 #define MPI3_SYSIF_FAULT_CODE_DIAG_FAULT_RESET                          (0x0000f000)
 #define MPI3_SYSIF_FAULT_CODE_CI_ACTIVATION_RESET                       (0x0000f001)

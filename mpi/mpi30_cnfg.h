@@ -201,8 +201,8 @@ struct mpi3_config_page_header {
 #define MPI3_MFGPAGE_DEVID_SAS4116                            (0x00a5)
 #define MPI3_MFGPAGE_DEVID_SAS5116_MPI                        (0x00b3)
 #define MPI3_MFGPAGE_DEVID_SAS5116_NVME                       (0x00b4)
-#define MPI3_MFGPAGE_DEVID_SAS5116_MPI_MGMT                   (0x00b5)
-#define MPI3_MFGPAGE_DEVID_SAS5116_NVME_MGMT                  (0x00b6)
+#define MPI3_MFGPAGE_DEVID_SAS5116_MPI_NS                     (0x00b5)
+#define MPI3_MFGPAGE_DEVID_SAS5116_NVME_NS                    (0x00b6)
 #define MPI3_MFGPAGE_DEVID_SAS5116_PCIE_SWITCH                (0x00b8)
 struct mpi3_man_page0 {
 	struct mpi3_config_page_header         header;
@@ -1984,6 +1984,7 @@ struct mpi3_pcie_io_unit_page1 {
 #define MPI3_PCIEIOUNIT1_CONTROL_FLAGS_REFCLK_OVERRIDE_DEASSERT                (0x04000000)
 #define MPI3_PCIEIOUNIT1_CONTROL_FLAGS_REFCLK_OVERRIDE_ASSERT                  (0x08000000)
 #define MPI3_PCIEIOUNIT1_CONTROL_FLAGS_REFCLK_OVERRIDE_BACKPLANE_ERROR         (0x0c000000)
+#define MPI3_PCIEIOUNIT1_CONTROL_FLAGS_PARTIAL_CAPACITY_ENABLE                 (0x00000100)
 #define MPI3_PCIEIOUNIT1_CONTROL_FLAGS_LINK_OVERRIDE_DISABLE                   (0x00000080)
 #define MPI3_PCIEIOUNIT1_CONTROL_FLAGS_CLOCK_OVERRIDE_DISABLE                  (0x00000040)
 #define MPI3_PCIEIOUNIT1_CONTROL_FLAGS_CLOCK_OVERRIDE_MODE_MASK                (0x00000030)
@@ -2210,6 +2211,7 @@ struct mpi3_device0_pcie_format {
 #define MPI3_DEVICE0_PCIE_RECOVER_REASON_PROTECTION         (0x03)
 #define MPI3_DEVICE0_PCIE_RECOVER_REASON_METADATA_SZ        (0x04)
 #define MPI3_DEVICE0_PCIE_RECOVER_REASON_LBA_DATA_SZ        (0x05)
+#define MPI3_DEVICE0_PCIE_RECOVER_REASON_PARTIAL_CAP        (0x06)
 struct mpi3_device0_vd_format {
 	u8         vd_state;
 	u8         raid_level;

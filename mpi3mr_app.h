@@ -85,6 +85,9 @@
 #define MPI3MR_HDB_REFRESH_TYPE_DEFAULT		2
 #define MPI3MR_HDB_HDB_REFRESH_TYPE_PERSISTENT	3
 
+#define MPI3MR_HDB_QUERY_ELEMENT_TRIGGER_FORMAT_INDEX	0
+#define MPI3MR_HDB_QUERY_ELEMENT_TRIGGER_FORMAT_DATA	1
+
 /* Supported BSG commands */
 enum command {
 	MPI3MRDRVCMD = 1,
@@ -265,8 +268,6 @@ struct mpi3mr_bsg_in_log_data {
  * @size: Buffer size
  * @rsvd2: Reserved
  * @trigger_data: Trigger specific data
- * @rsvd3: Reserved
- * @rsvd4: Reserved
  */
 struct mpi3mr_hdb_entry {
 	uint8_t buf_type;
@@ -275,9 +276,7 @@ struct mpi3mr_hdb_entry {
 	uint8_t rsvd1;
 	uint16_t size;
 	uint16_t rsvd2;
-	uint64_t trigger_data;
-	uint32_t rsvd3;
-	uint32_t rsvd4;
+	uint32_t trigger_data[4];
 };
 
 
@@ -289,16 +288,16 @@ struct mpi3mr_hdb_entry {
  * multiple hdb entries.
  *
  * @num_hdb_types: Number of host diag buffer types supported
+ * @element_trigger_format: Element trigger format
  * @rsvd1: Reserved
  * @rsvd2: Reserved
- * @rsvd3: Reserved
  * @entry: Diag buffer status entry
  */
 struct mpi3mr_bsg_in_hdb_status {
 	uint8_t num_hdb_types;
-	uint8_t rsvd1;
-	uint16_t rsvd2;
-	uint32_t rsvd3;
+	uint8_t element_trigger_format;
+	uint16_t rsvd1;
+	uint32_t rsvd2;
 	struct mpi3mr_hdb_entry entry[1]; //Variable length Array
 };
 
