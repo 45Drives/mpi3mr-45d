@@ -8,6 +8,8 @@
  */
 
 #include "mpi3mr.h"
+#include "mpi3mr_app.h"
+
 
 /* Global driver scope variables */
 LIST_HEAD(mrioc_list);
@@ -523,7 +525,8 @@ void mpi3mr_invalidate_devhandles(struct mpi3mr_ioc *mrioc)
  *
  * Return: true always.
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
+    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
 static bool mpi3mr_print_scmd(struct request *rq, void *data)
 #else
 static BLK_ITER_CALLBACK_RET_TYPE mpi3mr_print_scmd(struct request *rq,
@@ -557,7 +560,8 @@ out:
  *
  * Return: true always.
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
+    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
 static bool mpi3mr_flush_scmd(struct request *rq, void *data)
 #else
 static BLK_ITER_CALLBACK_RET_TYPE mpi3mr_flush_scmd(struct request *rq,
@@ -603,7 +607,8 @@ out:
  *
  * Return: true always.
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
+    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
 static bool mpi3mr_count_dev_pending(struct request *rq, void *data)
 #else
 static BLK_ITER_CALLBACK_RET_TYPE mpi3mr_count_dev_pending(struct request *rq,
@@ -639,7 +644,8 @@ out:
  *
  * Return: true always.
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
+    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
 static bool mpi3mr_count_tgt_pending(struct request *rq, void *data)
 #else
 static BLK_ITER_CALLBACK_RET_TYPE mpi3mr_count_tgt_pending(struct request *rq,
@@ -1045,7 +1051,7 @@ static int mpi3mr_report_tgtdev_to_host(struct mpi3mr_ioc *mrioc,
 	int retval = 0;
 	struct mpi3mr_tgt_dev *tgtdev;
 
-	if (mrioc->reset_in_progress)
+	if (mrioc->reset_in_progress || mrioc->pcie_err_recovery)
 		return -1;
 	tgtdev = mpi3mr_get_tgtdev_by_perst_id(mrioc, perst_id);
 	if (!tgtdev) {
@@ -1182,8 +1188,14 @@ void mpi3mr_refresh_tgtdevs(struct mpi3mr_ioc *mrioc)
 	tgtdev = NULL;
 	list_for_each_entry(tgtdev, &mrioc->tgtdev_list, list) {
 		if ((tgtdev->dev_handle != MPI3MR_INVALID_DEV_HANDLE) &&
-		    !tgtdev->is_hidden && !tgtdev->host_exposed)
-			mpi3mr_report_tgtdev_to_host(mrioc, tgtdev->perst_id);
+		    !tgtdev->is_hidden) {
+			if (!tgtdev->host_exposed)
+				mpi3mr_report_tgtdev_to_host(mrioc,
+				    tgtdev->perst_id);
+			else if (tgtdev->starget)
+				starget_for_each_device(tgtdev->starget,
+				    (void *) tgtdev, mpi3mr_update_sdev);
+	}
 	}
 	dprint_reset(mrioc, "refresh target devices: done\n");
 }
@@ -1588,7 +1600,8 @@ static void mpi3mr_process_trigger_data_event_bh(struct mpi3mr_ioc *mrioc,
 	unsigned long flags;
 	int retval = 0;
 	u8 trigger_type = event_data->trigger_type;
-	u64 trigger_data = event_data->trigger_specific_data;
+	union mpi3mr_trigger_data *trigger_data =
+		&event_data->trigger_specific_data;
 
 	if (event_data->snapdump)  {
 		if (trace_hdb)
@@ -2190,9 +2203,12 @@ static void mpi3mr_fwevt_bh(struct mpi3mr_ioc *mrioc,
 	}
 	case MPI3MR_DRIVER_EVENT_WAIT_FOR_DEVICES_TO_REFRESH:
 	{
-		while (mrioc->device_refresh_on) {
+		while ((mrioc->device_refresh_on || mrioc->block_on_pcie_err) &&
+		    !mrioc->unrecoverable && !mrioc->pcie_err_recovery) {
 			msleep(500);
 		}
+		if (mrioc->unrecoverable || mrioc->pcie_err_recovery)
+			break;
 		dprint_event_bh(mrioc,
 		    "scan for non responding and newly added devices after soft reset started\n");
 		if (mrioc->sas_transport_enabled) {
@@ -4131,6 +4147,12 @@ int mpi3mr_issue_tm(struct mpi3mr_ioc *mrioc, u8 tm_type,
 		mutex_unlock(&drv_cmd->mutex);
 		goto out;
 	}
+	if (mrioc->block_on_pcie_err) {
+		retval = -1;
+		dprint_tm(mrioc, "sending task management failed due to pcie error recovery in progress\n");
+		mutex_unlock(&drv_cmd->mutex);
+		goto out;
+	}
 
 	drv_cmd->state = MPI3MR_CMD_PENDING;
 	drv_cmd->is_waiting = 1;
@@ -4323,10 +4345,14 @@ static int mpi3mr_bios_param(struct scsi_device *sdev,
 	params[2] = cylinders;
 	return 0;
 }
-
 #if ((defined(RHEL_MAJOR) && (RHEL_MAJOR == 8)) || \
-	(KERNEL_VERSION(5, 0, 0) <= LINUX_VERSION_CODE))
+        (KERNEL_VERSION(5, 0, 0) <= LINUX_VERSION_CODE))
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || \
+    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
+static void mpi3mr_map_queues(struct Scsi_Host *shost)
+#else
 static int mpi3mr_map_queues(struct Scsi_Host *shost)
+#endif
 {
 	struct mpi3mr_ioc *mrioc = shost_priv(shost);
 	int i, qoff, offset;
@@ -4362,12 +4388,15 @@ static int mpi3mr_map_queues(struct Scsi_Host *shost)
 		qoff += map->nr_queues;
 		offset += map->nr_queues;
 	}
-
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || \
+    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
+	return;
+#else
 	return 0;
-
-}
-
 #endif
+}
+#endif
+
 
 /**
  * mpi3mr_print_pending_host_io - print pending I/Os
@@ -4421,7 +4450,8 @@ static int mpi3mr_eh_host_reset(struct scsi_cmnd *scmd)
 		    MPI3MR_RAID_ERRREC_RESET_TIMEOUT);
 		if (!mpi3mr_get_fw_pending_ios(mrioc)) {
 			while (mrioc->reset_in_progress ||
-			       mrioc->prepare_for_reset)
+			       mrioc->prepare_for_reset ||
+			       mrioc->block_on_pcie_err)
 				ssleep(1);
 			retval = SUCCESS;
 			goto out;
@@ -5274,7 +5304,8 @@ static int mpi3mr_qcmd(struct Scsi_Host *shost,
 		goto out;
 	}
 
-	if (mrioc->reset_in_progress || mrioc->prepare_for_reset) {
+	if (mrioc->reset_in_progress || mrioc->prepare_for_reset
+	    || mrioc->block_on_pcie_err) {
 		retval = SCSI_MLQUEUE_HOST_BUSY;
 		goto out;
 	}
@@ -5696,6 +5727,14 @@ mpi3mr_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	mrioc->logging_level = logging_level;
 	mrioc->shost = shost;
 	mrioc->pdev = pdev;
+	mrioc->pdevinfo.id = pdev->device;
+	mrioc->pdevinfo.revision = pdev->revision;
+	mrioc->pdevinfo.ssid = pdev->subsystem_device;
+	mrioc->pdevinfo.ssvid = pdev->subsystem_vendor;
+	mrioc->pdevinfo.bus = pdev->bus->number;
+	mrioc->pdevinfo.dev = PCI_SLOT(pdev->devfn);
+	mrioc->pdevinfo.func = PCI_FUNC(pdev->devfn);
+	mrioc->pdevinfo.segment = pci_domain_nr(pdev->bus);
 	mrioc->block_bsgs = 1;
 	mrioc->max_sgl_entries = max_sgl_entries;
 	if (max_sgl_entries > MPI3MR_MAX_SGL_ENTRIES)
@@ -5819,6 +5858,36 @@ shost_failed:
 	return retval;
 }
 
+
+
+/**
+ * mpi3mr_get_shost_and_mrioc - get shost and ioc reference if
+ *			they are valid
+ * @pdev: PCI device struct
+ * @shost: address to store scsi host reference
+ * @ioc: address store HBA adapter reference
+ *
+ * Return: 0 if *shost and *ioc are not NULL otherwise -1.
+ */
+static int
+mpi3mr_get_shost_and_mrioc(struct pci_dev *pdev,
+	struct Scsi_Host **shost, struct mpi3mr_ioc **mrioc)
+{
+	*shost = pci_get_drvdata(pdev);
+	if (*shost == NULL) {
+		dev_err(&pdev->dev,"pdev's driver data is null\n");
+		return -1;
+	}
+
+	*mrioc = shost_priv(*shost);
+	if (*mrioc == NULL) {
+		dev_err(&pdev->dev,"shost's private data is null\n");
+		*shost = NULL;
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * mpi3mr_remove - PCI remove callback
  * @pdev: PCI device instance
@@ -5831,19 +5900,24 @@ shost_failed:
  */
 static void mpi3mr_remove(struct pci_dev *pdev)
 {
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
+	struct Scsi_Host *shost;
 	struct mpi3mr_ioc *mrioc;
 	struct workqueue_struct	*wq;
 	unsigned long flags;
 	struct mpi3mr_tgt_dev *tgtdev, *tgtdev_next;
 
-	if (!shost)
+	if (mpi3mr_get_shost_and_mrioc(pdev, &shost, &mrioc))
 		return;
-
-	mrioc = shost_priv(shost);
 	while (mrioc->reset_in_progress || mrioc->is_driver_loading)
 		ssleep(1);
-	if (!pci_device_is_present(mrioc->pdev)) {
+	if (mrioc->block_on_pcie_err) {
+		mrioc->block_on_pcie_err= false;
+		scsi_unblock_requests(shost);
+		mrioc->unrecoverable = 1;
+	}
+
+	if (!pci_device_is_present(mrioc->pdev) ||
+	    mrioc->pcie_err_recovery) {
 		mrioc->unrecoverable = 1;
 		mpi3mr_flush_cmds_for_unrecovered_controller(mrioc);
 	}
@@ -5894,18 +5968,22 @@ static void mpi3mr_remove(struct pci_dev *pdev)
  */
 static void mpi3mr_shutdown(struct pci_dev *pdev)
 {
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
+	struct Scsi_Host *shost;
 	struct mpi3mr_ioc *mrioc;
 	struct workqueue_struct	*wq;
 	unsigned long flags;
 
-	if (!shost)
+	if (mpi3mr_get_shost_and_mrioc(pdev, &shost, &mrioc))
 		return;
-
-	mrioc = shost_priv(shost);
 	while (mrioc->reset_in_progress || mrioc->is_driver_loading)
 		ssleep(1);
 	mrioc->stop_drv_processing = 1;
+
+	if (mrioc->block_on_pcie_err) {
+		mrioc->block_on_pcie_err= false;
+		scsi_unblock_requests(shost);
+		mrioc->unrecoverable = 1;
+	}
 
 	mpi3mr_cleanup_fwevt_list(mrioc);
 	spin_lock_irqsave(&mrioc->fwevt_lock, flags);
@@ -5928,19 +6006,17 @@ static void mpi3mr_shutdown(struct pci_dev *pdev)
  * Change the power state to the given value and cleanup the IOC
  * by issuing MUR and shutdown notification
  *
- * Return: 0 always.
+ * Return: 0 on success, non-zero on failure
  */
 static int __maybe_unused
 mpi3mr_suspend(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
+	struct Scsi_Host *shost;
 	struct mpi3mr_ioc *mrioc;
 
-	if (!shost)
-		return 0;
-
-	mrioc = shost_priv(shost);
+	if (mpi3mr_get_shost_and_mrioc(pdev, &shost, &mrioc))
+		return -1;
 	while (mrioc->reset_in_progress || mrioc->is_driver_loading)
 		ssleep(1);
 	mrioc->stop_drv_processing = 1;
@@ -5970,15 +6046,13 @@ static int __maybe_unused
 mpi3mr_resume(struct device *dev)
 {
 	struct pci_dev *pdev = to_pci_dev(dev);
-	struct Scsi_Host *shost = pci_get_drvdata(pdev);
+	struct Scsi_Host *shost;
 	struct mpi3mr_ioc *mrioc;
 	pci_power_t device_state = pdev->current_state;
 	int r;
 
-	if (!shost)
-		return 0;
-
-	mrioc = shost_priv(shost);
+	if (mpi3mr_get_shost_and_mrioc(pdev, &shost, &mrioc))
+		return -1;
 
 	ioc_info(mrioc,
 	     "resuming controller pdev=0x%p, slot=%s, previous operating state [D%d]\n",
@@ -5987,7 +6061,7 @@ mpi3mr_resume(struct device *dev)
 	mrioc->cpu_count = num_online_cpus();
 	r = mpi3mr_setup_resources(mrioc);
 	if (r) {
-		ioc_err(mrioc, "setup resoruces failed[%d]\n", r);
+		ioc_err(mrioc, "setup resources failed[%d]\n", r);
 		return r;
 	}
 
@@ -6023,29 +6097,126 @@ static DRIVER_ATTR(version, S_IRUGO, event_counter_show, NULL);
  * @pdev: PCI device instance
  * @state: channel state
  *
- * Template function, need to implement actual handling
+ * This function is called by the PCI error recovery driver and
+ * based on the state passed by the PCI driver this function
+ * decides the actions to be recommended back to PCI driver.
  *
- * Return: PCI_ERS_RESULT_NEED_RESET
+ * For all of the states if there is no valid mrioc or scsi host
+ * references in the pci device then this function will return
+ * the resul as disconnect.
+ *
+ * For normal state, this function will return the result as can
+ * recover.
+ *
+ * For frozen state, this function will block for any pending
+ * controller initialization or re-initialization to complete,
+ * stop any new interactions with the controller and return
+ * status as reset required.
+ *
+ * For permanent failure state, this funcion will mark the
+ * controller as unrecoverable and return status as disconnect.
+ *
+ * Returns: PCI_ERS_RESULT_NEED_RESET or CAN_RECOVER or
+ * DISCONNECT based on the controller state.
  */
 static pci_ers_result_t
 mpi3mr_pcierr_detected(struct pci_dev *pdev, pci_channel_state_t state)
 {
+	struct Scsi_Host *shost;
+	struct mpi3mr_ioc *mrioc;
+	pci_ers_result_t ret_val = PCI_ERS_RESULT_DISCONNECT;
+
 	dev_info(&pdev->dev, "%s: callback invoked state(%d)\n", __func__,
 	    state);
-	return PCI_ERS_RESULT_NEED_RESET;
+
+	if (mpi3mr_get_shost_and_mrioc(pdev, &shost, &mrioc)) {
+		dev_err(&pdev->dev, "device not available\n");
+		return ret_val;
+	}
+
+	switch (state) {
+	case pci_channel_io_normal:
+		ret_val = PCI_ERS_RESULT_CAN_RECOVER;
+		break;
+	case pci_channel_io_frozen:
+		mrioc->pcie_err_recovery = true;
+		mrioc->block_on_pcie_err = true;
+		while (mrioc->reset_in_progress || mrioc->is_driver_loading)
+			ssleep(1);
+		scsi_block_requests(mrioc->shost);
+		mpi3mr_stop_watchdog(mrioc);
+		mpi3mr_cleanup_resources(mrioc);
+		mrioc->pdev = NULL;
+		ret_val = PCI_ERS_RESULT_NEED_RESET;
+		break;
+	case pci_channel_io_perm_failure:
+		mrioc->pcie_err_recovery = true;
+		mrioc->block_on_pcie_err = true;
+		mrioc->unrecoverable = 1;
+		mpi3mr_stop_watchdog(mrioc);
+		mpi3mr_flush_cmds_for_unrecovered_controller(mrioc);
+		ret_val = PCI_ERS_RESULT_DISCONNECT;
+		break;
+	default:
+		break;
+	}
+	return ret_val;
 }
 
 /**
- * mpi3mr_pcierr_slot_reset - PCI error recovery slot reset
+ * mpi3mr_pcierr_slot_reset_done - Post slot reset callback
  * @pdev: PCI device instance
  *
- * Template function, need to implement actual handling
+ * This function is called by the PCI error recovery driver
+ * after a slot or link reset issued by it for the recovery, the
+ * driver is expected to bring back the controller and
+ * initialize it.
  *
- * Return: PCI_ERS_RESULT_DISCONNECT
+ * This function restores pci state and reinitializes controller
+ * resoruces and the controller, this blocks for any pending
+ * reset to complete.
+ *
+ * Returns: PCI_ERS_RESULT_DISCONNECT on failure or
+ * PCI_ERS_RESULT_RECOVERED
  */
-static pci_ers_result_t mpi3mr_pcierr_slot_reset(struct pci_dev *pdev)
+static pci_ers_result_t mpi3mr_pcierr_slot_reset_done(struct pci_dev *pdev)
 {
+	struct Scsi_Host *shost;
+	struct mpi3mr_ioc *mrioc;
+
+
 	dev_info(&pdev->dev, "%s: callback invoked\n", __func__);
+
+	if (mpi3mr_get_shost_and_mrioc(pdev, &shost, &mrioc)) {
+		dev_err(&pdev->dev, "device not available\n");
+		return PCI_ERS_RESULT_DISCONNECT;
+	}
+
+	while (mrioc->reset_in_progress)
+		ssleep(1);
+
+	mrioc->pdev = pdev;
+	pci_restore_state(pdev);
+
+	if (mpi3mr_setup_resources(mrioc)) {
+		ioc_err(mrioc, "setup resources failed\n");
+		goto out_failed;
+	}
+	mrioc->unrecoverable = 0;
+	mrioc->pcie_err_recovery = false;
+
+	mpi3mr_set_trigger_data_in_all_hdb(mrioc,
+		    MPI3MR_HDB_TRIGGER_TYPE_FW_RELEASED, NULL, 0);
+	if (mpi3mr_soft_reset_handler(mrioc, MPI3MR_RESET_FROM_FIRMWARE, 0))
+		goto out_failed;
+
+	return PCI_ERS_RESULT_RECOVERED;
+
+out_failed:
+	mrioc->unrecoverable = 1;
+	mrioc->block_on_pcie_err = false;
+	scsi_unblock_requests(shost);
+	mpi3mr_start_watchdog(mrioc);
 	return PCI_ERS_RESULT_DISCONNECT;
 }
 
@@ -6054,31 +6225,67 @@ static pci_ers_result_t mpi3mr_pcierr_slot_reset(struct pci_dev *pdev)
  * callback
  * @pdev: PCI device instance
  *
- * Template function, need to implement actual handling
+ * This function enables all I/O and IOCTLs post reset issued as
+ * part of the PCI express Advanced Error Reporting and handling
  *
  * Return: Nothing.
  */
 static void mpi3mr_pcierr_resume(struct pci_dev *pdev)
 {
+	struct Scsi_Host *shost;
+	struct mpi3mr_ioc *mrioc;
+
 	dev_info(&pdev->dev, "%s: callback invoked\n", __func__);
+
+	if (mpi3mr_get_shost_and_mrioc(pdev, &shost, &mrioc)) {
+		dev_err(&pdev->dev, "device not available\n");
+		return;
+	}
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)) || \
+	(defined(RHEL_MAJOR) && (RHEL_MAJOR == 8) && (RHEL_MINOR >= 3)) \
+	|| (defined(CONFIG_SUSE_KERNEL) && ((CONFIG_SUSE_VERSION == 15) \
+	&& (CONFIG_SUSE_PATCHLEVEL >= 2))))
+	pci_aer_clear_nonfatal_status(pdev);
+#else
+	pci_cleanup_aer_uncorrect_error_status(pdev);
+#endif
+
+	if (mrioc->block_on_pcie_err) {
+		mrioc->block_on_pcie_err = false;
+		scsi_unblock_requests(shost);
+		mpi3mr_start_watchdog(mrioc);
+	}
+
 }
 
 /**
  * mpi3mr_pcierr_mmio_enabled - PCI error recovery callback
  * @pdev: PCI device instance
  *
- * Template function, need to implement actual handling
+ * This is called only if _pcierr_error_detected returns
+ * PCI_ERS_RESULT_CAN_RECOVER.
  *
- * Return: PCI_ERS_RESULT_RECOVERED
+ * Return: PCI_ERS_RESULT_DISCONNECT when the controller is
+ * unrecoverable or when the shost/mnrioc reference cannot be
+ * found, else return PCI_ERS_RESULT_RECOVERED
  */
 static pci_ers_result_t mpi3mr_pcierr_mmio_enabled(struct pci_dev *pdev)
 {
+
+	struct Scsi_Host *shost;
+	struct mpi3mr_ioc *mrioc;
 /*
- * This is called only if _pcierr_error_detected returns
- * PCI_ERS_RESULT_CAN_RECOVER. Read/Write to the device still works and
- * there is no need to reset the slot
+ *
  */
 	dev_info(&pdev->dev, "%s: callback invoked\n", __func__);
+
+	if (mpi3mr_get_shost_and_mrioc(pdev, &shost, &mrioc)) {
+		dev_err(&pdev->dev, "device not available\n");
+		return PCI_ERS_RESULT_DISCONNECT;
+	}
+	if (mrioc->unrecoverable)
+		return PCI_ERS_RESULT_DISCONNECT;
+
 	return PCI_ERS_RESULT_RECOVERED;
 }
 
@@ -6094,7 +6301,7 @@ MODULE_DEVICE_TABLE(pci, mpi3mr_pci_id_table);
 static struct pci_error_handlers mpi3mr_err_handler = {
 	.error_detected = mpi3mr_pcierr_detected,
 	.mmio_enabled = mpi3mr_pcierr_mmio_enabled,
-	.slot_reset = mpi3mr_pcierr_slot_reset,
+	.slot_reset = mpi3mr_pcierr_slot_reset_done,
 	.resume = mpi3mr_pcierr_resume,
 };
 

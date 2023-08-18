@@ -606,6 +606,12 @@ static int mpi3mr_set_identify(struct mpi3mr_ioc *mrioc, u16 handle,
 		return -EFAULT;
 	}
 
+	if (mrioc->pcie_err_recovery) {
+		ioc_err(mrioc, "%s: pcie error recovery in progress!\n",
+		    __func__);
+		return -EFAULT;
+	}
+
 	if ((mpi3mr_cfg_get_dev_pg0(mrioc, &ioc_status, &device_pg0,
 	    sizeof(device_pg0), MPI3_DEVICE_PGAD_FORM_HANDLE, handle))) {
 		ioc_err(mrioc, "%s: device page0 read failed\n", __func__);
@@ -728,6 +734,12 @@ static int mpi3mr_report_manufacture(struct mpi3mr_ioc *mrioc,
 		return -EFAULT;
 	}
 
+	if (mrioc->pcie_err_recovery) {
+		ioc_err(mrioc, "%s: pcie error recovery in progress!\n",
+		    __func__);
+		return -EFAULT;
+	}
+
 	data_out_sz = sizeof(struct rep_manu_request);
 	data_in_sz = sizeof(struct rep_manu_reply);
 	data_out = dma_zalloc_coherent(&mrioc->pdev->dev,
@@ -766,8 +778,7 @@ static int mpi3mr_report_manufacture(struct mpi3mr_ioc *mrioc,
 	    (unsigned long long)sas_address, port_id);
 
 	rc = mpi3mr_post_transport_req(mrioc, &mpi_request, request_sz,
-				       &mpi_reply, reply_sz,
-				       MPI3MR_INTADMCMD_TIMEOUT, &ioc_status);
+	    &mpi_reply, reply_sz, MPI3MR_INTADMCMD_TIMEOUT, &ioc_status);
 	if (rc)
 		goto out;
 
@@ -1456,7 +1467,7 @@ void mpi3mr_update_links(struct mpi3mr_ioc *mrioc,
 	struct mpi3mr_sas_node *mr_sas_node;
 	struct mpi3mr_sas_phy *mr_sas_phy;
 
-	if (mrioc->reset_in_progress)
+	if (mrioc->reset_in_progress || mrioc->pcie_err_recovery)
 		return;
 
 	spin_lock_irqsave(&mrioc->sas_node_lock, flags);
@@ -1562,6 +1573,12 @@ static int mpi3mr_get_expander_phy_error_log(struct mpi3mr_ioc *mrioc,
 
 	if (mrioc->reset_in_progress) {
 		ioc_err(mrioc, "%s: host reset in progress!\n", __func__);
+		return -EFAULT;
+	}
+
+	if (mrioc->pcie_err_recovery) {
+		ioc_err(mrioc, "%s: pcie error recovery in progress!\n",
+		    __func__);
 		return -EFAULT;
 	}
 
@@ -1831,6 +1848,12 @@ mpi3mr_expander_phy_control(struct mpi3mr_ioc *mrioc,
 
 	if (mrioc->reset_in_progress) {
 		ioc_err(mrioc, "%s: host reset in progress!\n", __func__);
+		return -EFAULT;
+	}
+
+	if (mrioc->pcie_err_recovery) {
+		ioc_err(mrioc, "%s: pcie error recovery in progress!\n",
+		    __func__);
 		return -EFAULT;
 	}
 
@@ -2273,6 +2296,13 @@ mpi3mr_transport_smp_handler(struct bsg_job *job, struct Scsi_Host *shost,
 		goto out;
 	}
 
+	if (mrioc->pcie_err_recovery) {
+		ioc_err(mrioc, "%s: pcie error recovery in progress!\n",
+		    __func__);
+		rc = -EFAULT;
+		goto out;
+	}
+
 	rc = mpi3mr_map_smp_buffer(&mrioc->pdev->dev, &job->request_payload,
 	    &dma_addr_out, &dma_len_out, &addr_out);
 	if (rc)
@@ -2306,8 +2336,7 @@ mpi3mr_transport_smp_handler(struct bsg_job *job, struct Scsi_Host *shost,
 	dprint_transport_info(mrioc, "sending SMP request \n");
 
 	rc = mpi3mr_post_transport_req(mrioc, &mpi_request, request_sz,
-			&mpi_reply, reply_sz, MPI3MR_INTADMCMD_TIMEOUT,
-			&ioc_status);
+	    &mpi_reply, reply_sz, MPI3MR_INTADMCMD_TIMEOUT, &ioc_status);
 	if (rc)
 		goto unmap_in;
 
@@ -2725,7 +2754,7 @@ int mpi3mr_expander_add(struct mpi3mr_ioc *mrioc, u16 handle)
 	if (!handle)
 		return -1;
 
-	if (mrioc->reset_in_progress)
+	if (mrioc->reset_in_progress || mrioc->pcie_err_recovery)
 		return -1;
 
 	if ((mpi3mr_cfg_get_sas_exp_pg0(mrioc, &ioc_status, &expander_pg0,
@@ -2935,7 +2964,7 @@ static void mpi3mr_expander_node_remove(struct mpi3mr_ioc *mrioc,
 	/* remove sibling ports attached to this expander */
 	list_for_each_entry_safe(mr_sas_port, next,
 	   &sas_expander->sas_port_list, port_list) {
-		if (mrioc->reset_in_progress)
+		if (mrioc->reset_in_progress || mrioc->pcie_err_recovery)
 			return;
 		if (mr_sas_port->remote_identify.device_type ==
 		    SAS_END_DEVICE)
@@ -2985,7 +3014,7 @@ void mpi3mr_expander_remove(struct mpi3mr_ioc *mrioc, u64 sas_address,
 	struct mpi3mr_sas_node *sas_expander;
 	unsigned long flags;
 
-	if (mrioc->reset_in_progress)
+	if (mrioc->reset_in_progress || mrioc->pcie_err_recovery)
 		return;
 
 	if (!hba_port)
@@ -3056,7 +3085,8 @@ void mpi3mr_sas_host_refresh(struct mpi3mr_ioc *mrioc)
 			ioc_info(mrioc, "hba_port entry: %p,"
 			   " port: %d is added to hba_port list\n",
 			   hba_port, hba_port->port_id);
-			if (mrioc->reset_in_progress)
+			if (mrioc->reset_in_progress ||
+			    mrioc->pcie_err_recovery)
 				hba_port->flags = MPI3MR_HBA_PORT_FLAG_NEW;
 			list_add_tail(&hba_port->list,
 			    &mrioc->hba_port_table_list);
