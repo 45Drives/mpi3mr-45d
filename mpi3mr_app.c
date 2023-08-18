@@ -120,12 +120,15 @@ mpi3mr_diag_buffer_for_type(struct mpi3mr_ioc *mrioc, u8 buf_type)
  * Return: Nothing
  */
 void mpi3mr_set_trigger_data_in_hdb(struct diag_buffer_desc *hdb,
-	u8 type, u64 data, bool force)
+	u8 type, union mpi3mr_trigger_data *trigger_data, bool force)
 {
 	if ((!force) && (hdb->trigger_type != MPI3MR_HDB_TRIGGER_TYPE_UNKNOWN))
 		return;
 	hdb->trigger_type = type;
-	hdb->trigger_data = data;
+	if (!trigger_data)
+		memset(&hdb->trigger_data, 0, sizeof(*trigger_data));
+	else
+		memcpy(&hdb->trigger_data, trigger_data, sizeof(*trigger_data));
 }
 
  /**
@@ -143,16 +146,16 @@ void mpi3mr_set_trigger_data_in_hdb(struct diag_buffer_desc *hdb,
  * Return: Nothing
  */
 void mpi3mr_set_trigger_data_in_all_hdb(struct mpi3mr_ioc *mrioc,
-	u8 type, u64 data, bool force)
+	u8 type, union mpi3mr_trigger_data *trigger_data, bool force)
 {
 	struct diag_buffer_desc *hdb = NULL;
 
 	hdb = mpi3mr_diag_buffer_for_type(mrioc, MPI3_DIAG_BUFFER_TYPE_TRACE);
 	if (hdb)
-		mpi3mr_set_trigger_data_in_hdb(hdb, type, data, force);
+		mpi3mr_set_trigger_data_in_hdb(hdb, type, trigger_data, force);
 	hdb = mpi3mr_diag_buffer_for_type(mrioc, MPI3_DIAG_BUFFER_TYPE_FW);
 	if (hdb)
-		mpi3mr_set_trigger_data_in_hdb(hdb, type, data, force);
+		mpi3mr_set_trigger_data_in_hdb(hdb, type, trigger_data, force);
 }
 
  /**
@@ -184,7 +187,7 @@ void mpi3mr_hdbstatuschg_evt_th(struct mpi3mr_ioc *mrioc,
 	{
 		diag_buffer->status = MPI3MR_HDB_BUFSTATUS_RELEASED;
 		mpi3mr_set_trigger_data_in_hdb(diag_buffer,
-		    MPI3MR_HDB_TRIGGER_TYPE_FW_RELEASED, 0, 0);
+		    MPI3MR_HDB_TRIGGER_TYPE_FW_RELEASED, NULL, 0);
 		atomic64_inc(&event_counter);
 		break;
 	}
@@ -458,7 +461,7 @@ int mpi3mr_issue_diag_buf_release(struct mpi3mr_ioc *mrioc,
 	if (retval) {
 		dprint_reset(mrioc, "%s: admin request post failed\n", __func__);
 		mpi3mr_set_trigger_data_in_hdb(diag_buffer,
-		    MPI3MR_HDB_TRIGGER_TYPE_UNKNOWN, 0, 1);
+		    MPI3MR_HDB_TRIGGER_TYPE_UNKNOWN, NULL, 1);
 		goto out_unlock;
 	}
 	wait_for_completion_timeout(&mrioc->init_cmds.done,
@@ -506,7 +509,7 @@ out_unlock:
  * Return: Nothing
  */
 static void mpi3mr_process_trigger(struct mpi3mr_ioc *mrioc, u8 trigger_type,
-    u64 trigger_data, u8 trigger_flags)
+    union mpi3mr_trigger_data *trigger_data, u8 trigger_flags)
 {
 	struct trigger_event_data event_data;
 	struct diag_buffer_desc *trace_hdb = NULL;
@@ -536,7 +539,8 @@ static void mpi3mr_process_trigger(struct mpi3mr_ioc *mrioc, u8 trigger_type,
 
 	memset(&event_data, 0, sizeof(event_data));
 	event_data.trigger_type = trigger_type;
-	event_data.trigger_specific_data = trigger_data;
+	memcpy(&event_data.trigger_specific_data, trigger_data,
+	    sizeof(*trigger_data));
 	global_trigger = le64_to_cpu(mrioc->driver_pg2->global_trigger);
 
 	if (global_trigger & MPI3_DRIVER2_GLOBALTRIGGER_SNAPDUMP_ENABLED) {
@@ -590,11 +594,16 @@ static void mpi3mr_process_trigger(struct mpi3mr_ioc *mrioc, u8 trigger_type,
 void mpi3mr_global_trigger(struct mpi3mr_ioc *mrioc, u64 trigger_data)
 {
 	unsigned long flags;
+	union mpi3mr_trigger_data trigger_specific_data;
 
 	spin_lock_irqsave(&mrioc->trigger_lock, flags);
-	if (le64_to_cpu(mrioc->driver_pg2->global_trigger) & trigger_data)
+	if (le64_to_cpu(mrioc->driver_pg2->global_trigger) & trigger_data){
+		memset(&trigger_specific_data, 0,
+		    sizeof(trigger_specific_data));
+		trigger_specific_data.global = trigger_data;
 		mpi3mr_process_trigger(mrioc, MPI3MR_HDB_TRIGGER_TYPE_GLOBAL,
-		    trigger_data, 0);
+		    &trigger_specific_data, 0);
+	}
 	spin_unlock_irqrestore(&mrioc->trigger_lock, flags);
 }
 /**
@@ -641,7 +650,9 @@ void mpi3mr_scsisense_trigger(struct mpi3mr_ioc *mrioc, u8 sensekey, u8 asc,
 				continue;
 			trigger_flags = scsi_sense_trigger->flags;
 			mpi3mr_process_trigger(mrioc,
-			    MPI3MR_HDB_TRIGGER_TYPE_ELEMENT, i, trigger_flags);
+			    MPI3MR_HDB_TRIGGER_TYPE_ELEMENT,
+			    (union mpi3mr_trigger_data *)scsi_sense_trigger,
+			    trigger_flags);
 			break;
 		}
 		spin_unlock_irqrestore(&mrioc->trigger_lock, flags);
@@ -679,7 +690,9 @@ void mpi3mr_event_trigger(struct mpi3mr_ioc *mrioc, u8 event)
 				continue;
 			trigger_flags = event_trigger->flags;
 			mpi3mr_process_trigger(mrioc,
-			    MPI3MR_HDB_TRIGGER_TYPE_ELEMENT, i, trigger_flags);
+			    MPI3MR_HDB_TRIGGER_TYPE_ELEMENT,
+			    (union mpi3mr_trigger_data *)event_trigger,
+			    trigger_flags);
 			break;
 		}
 		spin_unlock_irqrestore(&mrioc->trigger_lock, flags);
@@ -725,7 +738,9 @@ void mpi3mr_reply_trigger(struct mpi3mr_ioc *mrioc, u16 ioc_status,
 				continue;
 			trigger_flags = reply_trigger->flags;
 			mpi3mr_process_trigger(mrioc,
-			    MPI3MR_HDB_TRIGGER_TYPE_ELEMENT, i, trigger_flags);
+			    MPI3MR_HDB_TRIGGER_TYPE_ELEMENT,
+			    (union mpi3mr_trigger_data *)reply_trigger,
+			    trigger_flags);
 			break;
 		}
 		spin_unlock_irqrestore(&mrioc->trigger_lock, flags);
@@ -874,7 +889,7 @@ static int mpi3mr_bsg_pel_abort(struct mpi3mr_ioc *mrioc)
 		dprint_bsg_err(mrioc, "%s: reset in progress\n", __func__);
 		return -1;
 	}
-	if (mrioc->block_bsgs) {
+	if (mrioc->block_bsgs || mrioc->block_on_pcie_err) {
 		dprint_bsg_err(mrioc, "%s: bsgs are blocked\n", __func__);
 		return -1;
 	}
@@ -1141,7 +1156,7 @@ static long mpi3mr_bsg_repost_hdb(struct mpi3mr_ioc *mrioc,
 		return -EFAULT;
 	}
 	mpi3mr_set_trigger_data_in_hdb(diag_buffer,
-	    MPI3MR_HDB_TRIGGER_TYPE_UNKNOWN, 0, 1);
+	    MPI3MR_HDB_TRIGGER_TYPE_UNKNOWN, NULL, 1);
 
 	return 0;
 }
@@ -1182,10 +1197,14 @@ static long mpi3mr_bsg_query_hdb(struct mpi3mr_ioc *mrioc,
 		hbd_status_entry->buf_type = diag_buffer->type;
 		hbd_status_entry->status = diag_buffer->status;
 		hbd_status_entry->trigger_type = diag_buffer->trigger_type;
-		hbd_status_entry->trigger_data = diag_buffer->trigger_data;
+		memcpy(&hbd_status_entry->trigger_data,
+		    &diag_buffer->trigger_data,
+		    sizeof(hbd_status_entry->trigger_data));
 		hbd_status_entry->size = (diag_buffer->size / 1024);
 		hbd_status_entry++;
 	}
+	hbd_status->element_trigger_format =
+		MPI3MR_HDB_QUERY_ELEMENT_TRIGGER_FORMAT_DATA;
 
 	if (data_in_sz < 4) {
 		dprint_bsg_err(mrioc, "%s: invalid size passed\n", __func__);
@@ -1498,6 +1517,9 @@ static long mpi3mr_bsg_adp_reset(struct mpi3mr_ioc *mrioc,
 		goto out;
 	}
 
+	if (mrioc->unrecoverable || mrioc->block_on_pcie_err)
+		return -EINVAL;
+
 	sg_copy_to_buffer(job->request_payload.sg_list,
 			  job->request_payload.sg_cnt,
 			  &adpreset, sizeof(adpreset));
@@ -1543,26 +1565,31 @@ static long mpi3mr_bsg_populate_adpinfo(struct mpi3mr_ioc *mrioc,
 	struct mpi3mr_bsg_in_adpinfo adpinfo;
 
 	memset(&adpinfo, 0, sizeof(adpinfo));
+
 	adpinfo.adp_type = MPI3MR_BSG_ADPTYPE_AVGFAMILY;
-	adpinfo.pci_dev_id = mrioc->pdev->device;
-	adpinfo.pci_dev_hw_rev = mrioc->pdev->revision;
-	adpinfo.pci_subsys_dev_id = mrioc->pdev->subsystem_device;
-	adpinfo.pci_subsys_ven_id = mrioc->pdev->subsystem_vendor;
-	adpinfo.pci_bus = mrioc->pdev->bus->number;
-	adpinfo.pci_dev = PCI_SLOT(mrioc->pdev->devfn);
-	adpinfo.pci_func = PCI_FUNC(mrioc->pdev->devfn);
-	adpinfo.pci_seg_id = pci_domain_nr(mrioc->pdev->bus);
 	adpinfo.app_intfc_ver = MPI3MR_IOCTL_VERSION;
 
-	ioc_state = mpi3mr_get_iocstate(mrioc);
-	if (ioc_state == MRIOC_STATE_UNRECOVERABLE)
-		adpinfo.adp_state = MPI3MR_BSG_ADPSTATE_UNRECOVERABLE;
-	else if ((mrioc->reset_in_progress) || (mrioc->block_bsgs))
+	if (mrioc->reset_in_progress || mrioc->block_bsgs ||
+	    mrioc->block_on_pcie_err)
 		adpinfo.adp_state = MPI3MR_BSG_ADPSTATE_IN_RESET;
-	else if (ioc_state == MRIOC_STATE_FAULT)
-		adpinfo.adp_state = MPI3MR_BSG_ADPSTATE_FAULT;
-	else
-		adpinfo.adp_state = MPI3MR_BSG_ADPSTATE_OPERATIONAL;
+	else{
+		ioc_state = mpi3mr_get_iocstate(mrioc);
+		if (ioc_state == MRIOC_STATE_UNRECOVERABLE)
+			adpinfo.adp_state = MPI3MR_BSG_ADPSTATE_UNRECOVERABLE;
+		else if (ioc_state == MRIOC_STATE_FAULT)
+			adpinfo.adp_state = MPI3MR_BSG_ADPSTATE_FAULT;
+		else
+			adpinfo.adp_state = MPI3MR_BSG_ADPSTATE_OPERATIONAL;
+	}
+
+	adpinfo.pci_dev_id = mrioc->pdevinfo.id;
+	adpinfo.pci_dev_hw_rev = mrioc->pdevinfo.revision;
+	adpinfo.pci_subsys_dev_id = mrioc->pdevinfo.ssid;
+	adpinfo.pci_subsys_ven_id = mrioc->pdevinfo.ssvid;
+	adpinfo.pci_bus = mrioc->pdevinfo.bus;
+	adpinfo.pci_dev = mrioc->pdevinfo.dev;
+	adpinfo.pci_func = mrioc->pdevinfo.func;
+	adpinfo.pci_seg_id = mrioc->pdevinfo.segment;
 
 	memcpy((u8 *)&adpinfo.driver_info, (u8 *)&mrioc->driver_info,
 	    sizeof(adpinfo.driver_info));
@@ -2587,7 +2614,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 		mutex_unlock(&mrioc->bsg_cmds.mutex);
 		goto out;
 	}
-	if (mrioc->block_bsgs) {
+	if (mrioc->block_bsgs || mrioc->block_on_pcie_err) {
 		dprint_bsg_err(mrioc, "%s: bsgs are blocked\n", __func__);
 		rval = -EAGAIN;
 		mutex_unlock(&mrioc->bsg_cmds.mutex);
@@ -3114,15 +3141,18 @@ adp_state_show(struct device *dev, struct device_attribute *attr,
 	enum mpi3mr_iocstate ioc_state;
 	uint8_t adp_state;
 
-	ioc_state = mpi3mr_get_iocstate(mrioc);
-	if (ioc_state == MRIOC_STATE_UNRECOVERABLE)
-		adp_state = MPI3MR_BSG_ADPSTATE_UNRECOVERABLE;
-	else if ((mrioc->reset_in_progress) || (mrioc->block_bsgs))
+	if (mrioc->reset_in_progress || mrioc->block_bsgs ||
+		 mrioc->block_on_pcie_err)
 		adp_state = MPI3MR_BSG_ADPSTATE_IN_RESET;
-	else if (ioc_state == MRIOC_STATE_FAULT)
-		adp_state = MPI3MR_BSG_ADPSTATE_FAULT;
-	else
-		adp_state = MPI3MR_BSG_ADPSTATE_OPERATIONAL;
+	else{
+		ioc_state = mpi3mr_get_iocstate(mrioc);
+		if (ioc_state == MRIOC_STATE_UNRECOVERABLE)
+			adp_state = MPI3MR_BSG_ADPSTATE_UNRECOVERABLE;
+		else if (ioc_state == MRIOC_STATE_FAULT)
+			adp_state = MPI3MR_BSG_ADPSTATE_FAULT;
+		else
+			adp_state = MPI3MR_BSG_ADPSTATE_OPERATIONAL;
+	}
 
 	return snprintf(buf, PAGE_SIZE, "%u\n", adp_state);
 }
@@ -3193,8 +3223,9 @@ static int mpi3mr_app_issue_tm(struct mpi3mr_ioc *mrioc, u8 tm_type,
 	struct op_req_qinfo *op_req_q = NULL;
 	struct mpi3mr_drv_cmd *drv_cmd;
 
-	if ((mrioc->unrecoverable) || (mrioc->reset_in_progress) ||
-	    (mrioc->sysfs_tm_issued >= MPI3MR_NUM_SYSFS_TM)) {
+	if (mrioc->unrecoverable || mrioc->reset_in_progress ||
+	    mrioc->block_bsgs || mrioc->block_on_pcie_err ||
+	    mrioc->sysfs_tm_issued >= MPI3MR_NUM_SYSFS_TM) {
 		return r;
 	}
 	drv_cmd = &mrioc->sysfs_tm_cmds[mrioc->sysfs_tm_issued];
@@ -3244,7 +3275,8 @@ static int mpi3mr_app_issue_tm(struct mpi3mr_ioc *mrioc, u8 tm_type,
  *
  * Return: 0 on success, -1 on failure
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0))
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
+		(defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
 static bool mpi3mr_app_issue_abort_task(
     struct request *rq, void *data)
 #else
@@ -3300,7 +3332,8 @@ static void mpi3mr_app_tm_sysfs(struct mpi3mr_ioc *mrioc, u8 tm_type)
 	struct scsi_device *sdev;
 	unsigned long flags, r;
 
-	if ((mrioc->unrecoverable) || (mrioc->reset_in_progress))
+	if (mrioc->unrecoverable || mrioc->reset_in_progress ||
+	    mrioc->block_bsgs || mrioc->block_on_pcie_err)
 		return;
 
 	init_waitqueue_head(&mrioc->sysfs_pending_tm_wq);
@@ -3385,7 +3418,7 @@ mpi3mr_app_task_management_store(struct device *cdev,
 
 	if (sscanf(buf, "%d", &opcode) != 1)
 		return -EINVAL;
-	if (mrioc->unrecoverable)
+	if (mrioc->unrecoverable || mrioc->block_on_pcie_err)
 		return -EINVAL;
 
 	switch (opcode) {

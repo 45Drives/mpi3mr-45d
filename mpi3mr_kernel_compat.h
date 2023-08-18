@@ -109,7 +109,10 @@ static inline void mpi3mr_scsi_build_sense(struct scsi_cmnd *scmd,
 }
 
 #if ((defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 1)) \
-    || LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0))
+    || LINUX_VERSION_CODE >= KERNEL_VERSION(5,16,0)) \
+    || (defined(RHEL_MAJOR) && (RHEL_MAJOR == 8 && RHEL_MINOR >= 8)) \
+    || (defined(CONFIG_SUSE_KERNEL) && \
+    ((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5)))
 #define MPI3MR_SAS_LINK_RATE_22_5_GBPS SAS_LINK_RATE_22_5_GBPS
 #else
 #define MPI3MR_SAS_LINK_RATE_22_5_GBPS SAS_LINK_RATE_12_0_GBPS
@@ -122,7 +125,9 @@ static inline void mpi3mr_scsi_build_sense(struct scsi_cmnd *scmd,
 #endif
 
 #if ((LINUX_VERSION_CODE > KERNEL_VERSION(5,18,0)) || \
-     defined(SLES15SP4_AND_HIGHER_OSs_RT_KERNEL))
+     (defined(SLES15SP4_AND_HIGHER_OSs_RT_KERNEL)) ||  \
+     (defined(RHEL_MAJOR) && (RHEL_MAJOR == 8 && RHEL_MINOR >= 8)) || \
+     (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
 #define CACHED_VPD_PAGE_0x89_SUPPORTED
 #endif
 
