@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.7.1.0.0-45d1focal) focal; urgency=medium
+
+  * update to 8.7.1
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Thu, 07 Dec 2023 11:38:18 -0400
+
 mpi3mr-dkms (8.6.1.0.0-45d1focal) focal; urgency=medium
 
   * Updated upstream to 8.6.1.0.0

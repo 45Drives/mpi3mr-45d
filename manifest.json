@@ -3,7 +3,7 @@
     "name": "mpi3mr-dkms",
     "title": "mpi3mr",
     "prerelease": true,
-    "version": "8.6.1.0.0",
+    "version": "8.7.1.0.0",
     "buildVersion": "45d1",
     "author": "Joshua Boudreau <jboudreau@45drives.com>",
     "url": "https://github.com/45Drives/mpi3mr-45d",
@@ -49,7 +49,7 @@
     ],
     "changelog": {
         "urgency": "medium",
-        "version": "8.6.1.0.0",
+        "version": "8.7.1.0.0",
         "buildVersion": "45d1",
         "ignore": [],
         "date": null,

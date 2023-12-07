@@ -1,3 +1,3 @@
-## mpi3mr 8.6.1.0.0-45d1
+## mpi3mr 8.7.1.0.0-45d1
 
-* Updated upstream to 8.6.1.0.0
+* update to 8.7.1
