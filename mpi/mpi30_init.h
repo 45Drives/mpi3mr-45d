@@ -26,7 +26,7 @@ struct mpi3_scsi_io_request {
 	__le16                     change_count;
 	__le16                     dev_handle;
 	__le32                     flags;
-	__le32                     skip_count;
+	__le32                     io_use_only10;
 	__le32                     data_length;
 	u8                         lun[8];
 	union mpi3_scsi_io_cdb_union  cdb;
@@ -34,10 +34,11 @@ struct mpi3_scsi_io_request {
 };
 #define MPI3_SCSIIO_MSGFLAGS_METASGL_VALID                    (0x80)
 #define MPI3_SCSIIO_MSGFLAGS_DIVERT_TO_FIRMWARE               (0x40)
-#define MPI3_SCSIIO_FLAGS_LARGE_CDB                           (0x60000000)
+#define MPI3_SCSIIO_FLAGS_LARGE_CDB_MASK                      (0x60000000)
 #define MPI3_SCSIIO_FLAGS_CDB_16_OR_LESS                      (0x00000000)
 #define MPI3_SCSIIO_FLAGS_CDB_GREATER_THAN_16                 (0x20000000)
 #define MPI3_SCSIIO_FLAGS_CDB_IN_SEPARATE_BUFFER              (0x40000000)
+#define MPI3_SCSIIO_FLAGS_CDB_PRODUCT_SPECIFIC                (0x60000000)
 #define MPI3_SCSIIO_FLAGS_TASKATTRIBUTE_MASK                  (0x07000000)
 #define MPI3_SCSIIO_FLAGS_TASKATTRIBUTE_SIMPLEQ               (0x00000000)
 #define MPI3_SCSIIO_FLAGS_TASKATTRIBUTE_HEADOFQ               (0x01000000)
