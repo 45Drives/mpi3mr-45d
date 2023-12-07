@@ -45,6 +45,8 @@ rm -rf %{buildroot}
 exit 0
 
 %changelog
+* Thu Dec 07 2023 Joshua Boudreau <jboudreau@45drives.com> 8.7.1.0.0-45d2
+- Update dkms.conf to have proper version
 * Thu Dec 07 2023 Joshua Boudreau <jboudreau@45drives.com> 8.7.1.0.0-45d1
 - update to 8.7.1
 * Fri Aug 18 2023 Joshua Boudreau <jboudreau@45drives.com> 8.6.1.0.0-45d1

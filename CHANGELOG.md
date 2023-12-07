@@ -1,3 +1,3 @@
-## mpi3mr 8.7.1.0.0-45d1
+## mpi3mr 8.7.1.0.0-45d2
 
-* update to 8.7.1
+* Update dkms.conf to have proper version
