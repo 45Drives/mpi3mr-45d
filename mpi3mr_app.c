@@ -1016,6 +1016,22 @@ mpi3mr_bsg_refresh_hdb_triggers(struct mpi3mr_ioc *mrioc,
 		    __func__);
 		return rval;
 	}
+
+	if (mrioc->unrecoverable) {
+		dprint_bsg_err(mrioc, "%s: unrecoverable controller\n",
+		    __func__);
+		return -EFAULT;
+	}
+	if (mrioc->reset_in_progress) {
+		dprint_bsg_err(mrioc, "%s: reset in progress\n", __func__);
+		return -EAGAIN;
+	}
+	if (mrioc->block_bsgs || mrioc->block_on_pcie_err) {
+		dprint_bsg_err(mrioc, "%s: bsgs are blocked\n", __func__);
+		return -EAGAIN;
+	}
+
+
 	sg_copy_to_buffer(job->request_payload.sg_list,
 	    job->request_payload.sg_cnt,
 	    &refresh_triggers, sizeof(refresh_triggers));
@@ -1130,6 +1146,19 @@ static long mpi3mr_bsg_repost_hdb(struct mpi3mr_ioc *mrioc,
 		dprint_bsg_err(mrioc, "%s: invalid size argument\n",
 		    __func__);
 		return -EINVAL;
+	}
+	if (mrioc->unrecoverable) {
+		dprint_bsg_err(mrioc, "%s: unrecoverable controller\n",
+		    __func__);
+		return -EFAULT;
+	}
+	if (mrioc->reset_in_progress) {
+		dprint_bsg_err(mrioc, "%s: reset in progress\n", __func__);
+		return -EAGAIN;
+	}
+	if (mrioc->block_bsgs || mrioc->block_on_pcie_err) {
+		dprint_bsg_err(mrioc, "%s: bsgs are blocked\n", __func__);
+		return -EAGAIN;
 	}
 
 	sg_copy_to_buffer(job->request_payload.sg_list,
@@ -1320,6 +1349,20 @@ static long mpi3mr_bsg_pel_enable(struct mpi3mr_ioc *mrioc,
 		dprint_bsg_err(mrioc, "%s: invalid size argument\n",
 		    __func__);
 		return rval;
+	}
+
+	if (mrioc->unrecoverable) {
+		dprint_bsg_err(mrioc, "%s: unrecoverable controller\n",
+		    __func__);
+		return -EFAULT;
+	}
+	if (mrioc->reset_in_progress) {
+		dprint_bsg_err(mrioc, "%s: reset in progress\n", __func__);
+		return -EAGAIN;
+	}
+	if (mrioc->block_bsgs || mrioc->block_on_pcie_err) {
+		dprint_bsg_err(mrioc, "%s: bsgs are blocked\n", __func__);
+		return -EAGAIN;
 	}
 
 	sg_copy_to_buffer(job->request_payload.sg_list,
@@ -1565,7 +1608,6 @@ static long mpi3mr_bsg_populate_adpinfo(struct mpi3mr_ioc *mrioc,
 	struct mpi3mr_bsg_in_adpinfo adpinfo;
 
 	memset(&adpinfo, 0, sizeof(adpinfo));
-
 	adpinfo.adp_type = MPI3MR_BSG_ADPTYPE_AVGFAMILY;
 	adpinfo.app_intfc_ver = MPI3MR_IOCTL_VERSION;
 
@@ -3475,18 +3517,9 @@ mpi3mr_app_task_management_store(struct device *cdev,
 static DEVICE_ATTR(task_management, 0200, NULL,
 	mpi3mr_app_task_management_store);
 
-#if (KERNEL_VERSION(5, 16, 0) > LINUX_VERSION_CODE)
-struct device_attribute *mpi3mr_host_attrs[] = {
-	&dev_attr_version_fw,
-	&dev_attr_fw_queue_depth,
-	&dev_attr_op_req_q_count,
-	&dev_attr_reply_queue_count,
-	&dev_attr_logging_level,
-	&dev_attr_adp_state,
-	&dev_attr_task_management,
-	NULL,
-};
-#else
+#if ((KERNEL_VERSION(5, 16, 0) <= LINUX_VERSION_CODE) || \
+	(defined(CONFIG_SUSE_KERNEL) && \
+	((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
 static struct attribute *mpi3mr_host_attrs[] = {
 	&dev_attr_version_fw.attr,
 	&dev_attr_fw_queue_depth.attr,
@@ -3504,6 +3537,19 @@ static const struct attribute_group mpi3mr_host_attr_group = {
 
 const struct attribute_group *mpi3mr_host_groups[] = {
 	&mpi3mr_host_attr_group,
+	NULL,
+};
+
+#else
+
+struct device_attribute *mpi3mr_host_attrs[] = {
+	&dev_attr_version_fw,
+	&dev_attr_fw_queue_depth,
+	&dev_attr_op_req_q_count,
+	&dev_attr_reply_queue_count,
+	&dev_attr_logging_level,
+	&dev_attr_adp_state,
+	&dev_attr_task_management,
 	NULL,
 };
 #endif
@@ -3740,7 +3786,9 @@ slot_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(slot);
 
-#if (KERNEL_VERSION(5, 16, 0) > LINUX_VERSION_CODE)
+#if ((KERNEL_VERSION(5, 16, 0) <= LINUX_VERSION_CODE) || \
+	(defined(CONFIG_SUSE_KERNEL) && \
+	((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
 struct device_attribute *mpi3mr_dev_attrs[] = {
 	&dev_attr_sata_ncq_prio_enable,
 	&dev_attr_sas_address,
@@ -3767,4 +3815,15 @@ const struct attribute_group *mpi3mr_dev_groups[] = {
 	&mpi3mr_dev_attr_group,
 	NULL,
 };
+
+#else
+
+struct device_attribute *mpi3mr_dev_attrs[] = {
+	&dev_attr_sata_ncq_prio_enable,
+	&dev_attr_sas_address,
+	&dev_attr_device_handle,
+	&dev_attr_persistent_id,
+	NULL,
+};
+
 #endif

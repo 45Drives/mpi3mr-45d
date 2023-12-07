@@ -28,13 +28,17 @@ static inline void mpi3mr_set_dumper_active(struct mpi3mr_kmsg_dumper *dumper)
 #endif
 }
 
-#if (KERNEL_VERSION(5,15,0) <= LINUX_VERSION_CODE)
+#if ((KERNEL_VERSION(5,15,0) <= LINUX_VERSION_CODE) || \
+    (defined(CONFIG_SUSE_KERNEL) && \
+    ((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
 #define SCMD_GET_REQUEST(scmd)		scsi_cmd_to_rq(scmd)
 #else
 #define SCMD_GET_REQUEST(scmd)		scmd->request
 #endif
 
-#if (KERNEL_VERSION(5,16,0) <= LINUX_VERSION_CODE)
+#if ((KERNEL_VERSION(5,16,0) <= LINUX_VERSION_CODE) || \
+    (defined(CONFIG_SUSE_KERNEL) && \
+    ((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
 #define SCMD_DONE(scmd)			scsi_done(scmd)
 #else
 #define SCMD_DONE(scmd)			scmd->scsi_done(scmd)
@@ -127,7 +131,9 @@ static inline void mpi3mr_scsi_build_sense(struct scsi_cmnd *scmd,
 #if ((LINUX_VERSION_CODE > KERNEL_VERSION(5,18,0)) || \
      (defined(SLES15SP4_AND_HIGHER_OSs_RT_KERNEL)) ||  \
      (defined(RHEL_MAJOR) && (RHEL_MAJOR == 8 && RHEL_MINOR >= 8)) || \
-     (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
+     (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)) || \
+	 (defined(CONFIG_SUSE_KERNEL) && \
+	 ((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
 #define CACHED_VPD_PAGE_0x89_SUPPORTED
 #endif
 

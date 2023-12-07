@@ -72,8 +72,8 @@ extern spinlock_t mrioc_list_lock;
 extern struct list_head mrioc_list;
 extern atomic64_t event_counter;
 
-#define MPI3MR_DRIVER_VERSION	"8.6.1.0.0-45d"
-#define MPI3MR_DRIVER_RELDATE	"14-July-2023"
+#define MPI3MR_DRIVER_VERSION	"8.7.1.0.0-45d"
+#define MPI3MR_DRIVER_RELDATE	"13-September-2023"
 
 #define MPI3MR_DRIVER_NAME	"mpi3mr"
 #define MPI3MR_DRIVER_LICENSE	"GPL"
@@ -1513,12 +1513,14 @@ void mpi3mr_app_save_logdata(struct mpi3mr_ioc *mrioc, char *event_data,
 int mpi3mr_process_op_reply_q(struct mpi3mr_ioc *mrioc,
     struct op_reply_qinfo *op_reply_q);
 
-#if (KERNEL_VERSION(5, 16, 0) > LINUX_VERSION_CODE)
-extern struct device_attribute *mpi3mr_host_attrs[];
-extern struct device_attribute *mpi3mr_dev_attrs[];
-#else
+#if ((KERNEL_VERSION(5, 16, 0) <= LINUX_VERSION_CODE) || \
+	(defined(CONFIG_SUSE_KERNEL) && \
+	((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
 extern const struct attribute_group *mpi3mr_host_groups[];
 extern const struct attribute_group *mpi3mr_dev_groups[];
+#else
+extern struct device_attribute *mpi3mr_host_attrs[];
+extern struct device_attribute *mpi3mr_dev_attrs[];
 #endif
 
 u8 mpi3mr_scsih_ncq_prio_supp(struct scsi_device *sdev);
