@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.7.1.0.0-45d3focal) focal; urgency=medium
+
+  * fix generated patch
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Thu, 07 Dec 2023 12:07:50 -0400
+
 mpi3mr-dkms (8.7.1.0.0-45d2focal) focal; urgency=medium
 
   * Update dkms.conf to have proper version
