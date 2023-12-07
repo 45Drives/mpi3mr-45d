@@ -3,6 +3,7 @@
 config SCSI_MPI3MR
 	tristate "Broadcom MPI3 Storage Controller Device Driver"
 	depends on PCI && SCSI
-	---help---
-	This driver supports Broadcom's Unified MPI3 based Storage & RAID Controllers.
-
+	select BLK_DEV_BSGLIB
+	select SCSI_SAS_ATTRS
+	help
+	MPI3 based Storage & RAID Controllers Driver.

@@ -110,7 +110,7 @@ struct mpi3_target_assist_request {
 	__le16                     queue_tag;
 	__le16                     io_index;
 	__le16                     initiator_connection_tag;
-	__le32                     skip_count;
+	__le32                     ioc_use_only18;
 	__le32                     data_length;
 	__le32                     port_transfer_length;
 	__le32                     primary_reference_tag;

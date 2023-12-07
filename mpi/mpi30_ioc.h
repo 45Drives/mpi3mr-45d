@@ -27,15 +27,16 @@ struct mpi3_ioc_init_request {
 	__le64                   sense_buffer_free_queue_address;
 	__le64                   driver_information_address;
 };
-#define MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_MASK          (0x03)
-#define MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_NOT_USED      (0x00)
-#define MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_SEPARATED     (0x01)
-#define MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_INLINE        (0x02)
-#define MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_BOTH          (0x03)
-#define MPI3_WHOINIT_NOT_INITIALIZED                     (0x00)
-#define MPI3_WHOINIT_ROM_BIOS                            (0x02)
-#define MPI3_WHOINIT_HOST_DRIVER                         (0x03)
-#define MPI3_WHOINIT_MANUFACTURER                        (0x04)
+#define MPI3_IOCINIT_MSGFLAGS_SCSIIOSTATUSREPLY_SUPPORTED   (0x04)
+#define MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_MASK             (0x03)
+#define MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_NOT_USED         (0x00)
+#define MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_SEPARATED        (0x01)
+#define MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_INLINE           (0x02)
+#define MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_BOTH             (0x03)
+#define MPI3_WHOINIT_NOT_INITIALIZED                        (0x00)
+#define MPI3_WHOINIT_ROM_BIOS                               (0x02)
+#define MPI3_WHOINIT_HOST_DRIVER                            (0x03)
+#define MPI3_WHOINIT_MANUFACTURER                           (0x04)
 struct mpi3_driver_info_layout {
 	__le32             information_length;
 	u8                 driver_signature[12];

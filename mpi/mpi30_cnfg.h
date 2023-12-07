@@ -295,6 +295,7 @@ struct mpi3_man6_gpio_entry {
 #define MPI3_MAN6_GPIO_FUNCTION_BOARD_FAN_CONTROL                             (0x16)
 #define MPI3_MAN6_GPIO_FUNCTION_BOARD_FAN_FAULT                               (0x17)
 #define MPI3_MAN6_GPIO_FUNCTION_POWER_BRAKE                                   (0x18)
+#define MPI3_MAN6_GPIO_FUNCTION_MGMT_CONTROLLER_RESET                         (0x19)
 #define MPI3_MAN6_GPIO_ISTWI_RESET_FUNCTIONFLAGS_DEVSELECT_MASK               (0x01)
 #define MPI3_MAN6_GPIO_ISTWI_RESET_FUNCTIONFLAGS_DEVSELECT_ISTWI              (0x00)
 #define MPI3_MAN6_GPIO_ISTWI_RESET_FUNCTIONFLAGS_DEVSELECT_RECEPTACLEID       (0x01)
@@ -462,11 +463,30 @@ struct mpi3_man10_istwi_ctrlr_entry {
 	u8         scl_high_override;
 	__le16     reserved06;
 };
-#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_SPEED_MASK         (0x000c)
-#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_SPEED_100K         (0x0000)
-#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_SPEED_400K         (0x0004)
-#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_TARGET_ENABLED         (0x0002)
-#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_INITIATOR_ENABLED      (0x0001)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I2C_GLICH_FLTR_MASK        (0xc000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I2C_GLICH_FLTR_SHIFT       (14)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I2C_GLICH_FLTR_50_NS       (0x0000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I2C_GLICH_FLTR_10_NS       (0x4000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I2C_GLICH_FLTR_5_NS        (0x8000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I2C_GLICH_FLTR_0_NS        (0xc000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_TYPE_MASK              (0x3000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_TYPE_SHIFT             (12)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_TYPE_I2C               (0x0000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_TYPE_I3C               (0x1000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_TYPE_AUTO              (0x2000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I3C_MAX_DATA_RATE_MASK     (0x0e00)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I3C_MAX_DATA_RATE_SHIFT    (9)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I3C_MAX_DATA_RATE_12_5_MHZ (0x0000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I3C_MAX_DATA_RATE_8_MHZ    (0x0200)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I3C_MAX_DATA_RATE_6_MHZ    (0x0400)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I3C_MAX_DATA_RATE_4_MHZ    (0x0600)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_I3C_MAX_DATA_RATE_2_MHZ    (0x0800)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_SPEED_MASK             (0x000c)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_SPEED_SHIFT            (0)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_SPEED_100_KHZ          (0x0000)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_BUS_SPEED_400_KHZ          (0x0004)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_TARGET_ENABLED             (0x0002)
+#define MPI3_MAN10_ISTWI_CTRLR_FLAGS_INITIATOR_ENABLED          (0x0001)
 #ifndef MPI3_MAN10_ISTWI_CTRLR_MAX
 #define MPI3_MAN10_ISTWI_CTRLR_MAX          (1)
 #endif
@@ -538,12 +558,18 @@ struct mpi3_man11_bkplane_spec_non_ubm_format {
 };
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_GROUP_MASK                    (0xf000)
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_GROUP_SHIFT                   (12)
+#define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_REFCLK_POLICY_MASK            (0x0600)
+#define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_REFCLK_POLICY_SHIFT           (9)
+#define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_REFCLK_POLICY_DEVICE_PRESENT  (0x0000)
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_REFCLK_POLICY_ALWAYS_ENABLED  (0x0200)
+#define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_REFCLK_POLICY_SRIS            (0x0400)
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_LINKWIDTH_MASK                (0x00c0)
+#define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_LINKWIDTH_SHIFT               (6)
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_LINKWIDTH_4                   (0x0000)
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_LINKWIDTH_2                   (0x0040)
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_LINKWIDTH_1                   (0x0080)
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_PRESENCE_DETECT_MASK          (0x0030)
+#define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_PRESENCE_DETECT_SHIFT         (4)
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_PRESENCE_DETECT_GPIO          (0x0000)
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_PRESENCE_DETECT_REG           (0x0010)
 #define MPI3_MAN11_BKPLANE_NON_UBM_FLAGS_POLL_INTERVAL_MASK            (0x000f)
@@ -974,6 +1000,7 @@ struct mpi3_io_unit_page5 {
 #define MPI3_IOUNIT5_DEVICE_SHUTDOWN_SAS_SSD_MASK          (0x0003)
 #define MPI3_IOUNIT5_DEVICE_SHUTDOWN_SAS_SSD_SHIFT         (0)
 #define MPI3_IOUNIT5_FLAGS_SATAPUIS_MASK                   (0x0c)
+#define MPI3_IOUNIT5_FLAGS_SATAPUIS_SHIFT                  (2)
 #define MPI3_IOUNIT5_FLAGS_SATAPUIS_NOT_SUPPORTED          (0x00)
 #define MPI3_IOUNIT5_FLAGS_SATAPUIS_OS_CONTROLLED          (0x04)
 #define MPI3_IOUNIT5_FLAGS_SATAPUIS_APP_CONTROLLED         (0x08)
@@ -993,16 +1020,31 @@ struct mpi3_io_unit_page6 {
 #ifndef MPI3_IOUNIT8_DIGEST_MAX
 #define MPI3_IOUNIT8_DIGEST_MAX                   (1)
 #endif
-union mpi3_iounit8_digest {
+union mpi3_iounit8_raw_digest {
 	__le32                             dword[16];
 	__le16                             word[32];
 	u8                                 byte[64];
+};
+struct mpi3_iounit8_metadata_digest {
+	u8                                 slot_status;
+	u8                                 reserved01[3];
+	__le32                             reserved04[3];
+	union mpi3_iounit8_raw_digest         digest_data;
+};
+#define MPI3_IOUNIT8_METADATA_DIGEST_SLOTSTATUS_UNUSED                 (0x00)
+#define MPI3_IOUNIT8_METADATA_DIGEST_SLOTSTATUS_UPDATE_PENDING         (0x01)
+#define MPI3_IOUNIT8_METADATA_DIGEST_SLOTSTATUS_VALID                  (0x03)
+#define MPI3_IOUNIT8_METADATA_DIGEST_SLOTSTATUS_INVALID                (0x07)
+union mpi3_iounit8_digest {
+	union mpi3_iounit8_raw_digest         raw_digest[MPI3_IOUNIT8_DIGEST_MAX];
+	struct mpi3_iounit8_metadata_digest    metadata_digest[MPI3_IOUNIT8_DIGEST_MAX];
 };
 struct mpi3_io_unit_page8 {
 	struct mpi3_config_page_header         header;
 	u8                                 sb_mode;
 	u8                                 sb_state;
-	__le16                             reserved0a;
+	u8                                 flags;
+	u8                                 reserved0a;
 	u8                                 num_slots;
 	u8                                 slots_available;
 	u8                                 current_key_encryption_algo;
@@ -1010,15 +1052,18 @@ struct mpi3_io_unit_page8 {
 	union mpi3_version_union              current_svn;
 	__le32                             reserved14;
 	__le32                             current_key[128];
-	union mpi3_iounit8_digest             digest[MPI3_IOUNIT8_DIGEST_MAX];
+	union mpi3_iounit8_digest             digest;
 };
-#define MPI3_IOUNIT8_PAGEVERSION                  (0x00)
-#define MPI3_IOUNIT8_SBMODE_SECURE_DEBUG          (0x04)
-#define MPI3_IOUNIT8_SBMODE_HARD_SECURE           (0x02)
-#define MPI3_IOUNIT8_SBMODE_CONFIG_SECURE         (0x01)
-#define MPI3_IOUNIT8_SBSTATE_SVN_UPDATE_PENDING   (0x04)
-#define MPI3_IOUNIT8_SBSTATE_KEY_UPDATE_PENDING   (0x02)
-#define MPI3_IOUNIT8_SBSTATE_SECURE_BOOT_ENABLED  (0x01)
+#define MPI3_IOUNIT8_PAGEVERSION                                  (0x00)
+#define MPI3_IOUNIT8_SBMODE_SECURE_DEBUG                          (0x04)
+#define MPI3_IOUNIT8_SBMODE_HARD_SECURE                           (0x02)
+#define MPI3_IOUNIT8_SBMODE_CONFIG_SECURE                         (0x01)
+#define MPI3_IOUNIT8_SBSTATE_SVN_UPDATE_PENDING                   (0x04)
+#define MPI3_IOUNIT8_SBSTATE_KEY_UPDATE_PENDING                   (0x02)
+#define MPI3_IOUNIT8_SBSTATE_SECURE_BOOT_ENABLED                  (0x01)
+#define MPI3_IOUNIT8_FLAGS_DIGESTFORM_MASK                        (0x07)
+#define MPI3_IOUNIT8_FLAGS_DIGESTFORM_RAW                         (0x00)
+#define MPI3_IOUNIT8_FLAGS_DIGESTFORM_DIGEST_WITH_METADATA        (0x01)
 struct mpi3_io_unit_page9 {
 	struct mpi3_config_page_header         header;
 	__le32                             flags;
@@ -1168,6 +1213,25 @@ struct mpi3_io_unit_page15 {
 #define MPI3_IOUNIT15_FLAGS_EPRSUPPORT_WITHOUT_POWER_BRAKE_GPIO     (0x01)
 #define MPI3_IOUNIT15_FLAGS_EPRSUPPORT_WITH_POWER_BRAKE_GPIO        (0x02)
 #define MPI3_IOUNIT15_NUMPOWERBUDGETDATA_POWER_BUDGETING_DISABLED   (0x00)
+#ifndef MPI3_IOUNIT16_ERROR_MAX
+#define MPI3_IOUNIT16_ERROR_MAX                                      (1)
+#endif
+struct mpi3_iounit16_error {
+	__le32                             offset;
+	__le32                             reserved04;
+	__le64                             count;
+	__le64                             timestamp;
+};
+struct mpi3_io_unit_page16 {
+	struct mpi3_config_page_header         header;
+	__le64                             total_error_count;
+	__le32                             reserved10[3];
+	u8                                 num_errors;
+	u8                                 max_errors_tracked;
+	__le16                             reserved1e;
+	struct mpi3_iounit16_error             error[MPI3_IOUNIT16_ERROR_MAX];
+};
+#define MPI3_IOUNIT16_PAGEVERSION                                   (0x00)
 struct mpi3_ioc_page0 {
 	struct mpi3_config_page_header         header;
 	__le32                             reserved08;
@@ -2120,6 +2184,7 @@ struct mpi3_enclosure_page0 {
 	__le16                             sep_dev_handle;
 	u8                                 chassis_slot;
 	u8                                 reserved1d[3];
+	__le32                             receptacle_ids;
 };
 #define MPI3_ENCLOSURE0_PAGEVERSION                     (0x00)
 #define MPI3_ENCLS0_FLAGS_ENCL_TYPE_MASK                (0xc000)
@@ -2134,6 +2199,7 @@ struct mpi3_enclosure_page0 {
 #define MPI3_ENCLS0_FLAGS_MNG_UNKNOWN                   (0x0000)
 #define MPI3_ENCLS0_FLAGS_MNG_IOC_SES                   (0x0001)
 #define MPI3_ENCLS0_FLAGS_MNG_SES_ENCLOSURE             (0x0002)
+#define MPI3_ENCLS0_RECEPTACLEIDS_NOT_REPORTED          (0x00000000)
 #define MPI3_DEVICE_DEVFORM_SAS_SATA                    (0x00)
 #define MPI3_DEVICE_DEVFORM_PCIE                        (0x01)
 #define MPI3_DEVICE_DEVFORM_VD                          (0x02)

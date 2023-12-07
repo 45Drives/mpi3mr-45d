@@ -1164,7 +1164,8 @@ void mpi3mr_refresh_tgtdevs(struct mpi3mr_ioc *mrioc)
 	dprint_reset(mrioc, "refresh target devices: check for removals\n");
 	list_for_each_entry_safe(tgtdev, tgtdev_next, &mrioc->tgtdev_list,
 	    list) {
-		if ((tgtdev->dev_handle == MPI3MR_INVALID_DEV_HANDLE) &&
+		if (((tgtdev->dev_handle == MPI3MR_INVALID_DEV_HANDLE) ||
+		     tgtdev->is_hidden) &&
 		    tgtdev->host_exposed && tgtdev->starget &&
 		    tgtdev->starget->hostdata) {
 			tgt_priv = tgtdev->starget->hostdata;
@@ -1181,6 +1182,10 @@ void mpi3mr_refresh_tgtdevs(struct mpi3mr_ioc *mrioc)
 				mpi3mr_remove_tgtdev_from_host(mrioc, tgtdev);
 			mpi3mr_tgtdev_del_from_list(mrioc, tgtdev, true);
 			mpi3mr_tgtdev_put(tgtdev);
+		} else if (tgtdev->is_hidden & tgtdev->host_exposed) {
+			dprint_reset(mrioc, "hiding target device with perst_id(%d)\n",
+			    tgtdev->perst_id);
+			mpi3mr_remove_tgtdev_from_host(mrioc, tgtdev);
 		}
 	}
 
@@ -4345,10 +4350,13 @@ static int mpi3mr_bios_param(struct scsi_device *sdev,
 	params[2] = cylinders;
 	return 0;
 }
+
 #if ((defined(RHEL_MAJOR) && (RHEL_MAJOR == 8)) || \
         (KERNEL_VERSION(5, 0, 0) <= LINUX_VERSION_CODE))
 #if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || \
-    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
+    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)) || \
+    (defined(CONFIG_SUSE_KERNEL) && \
+    ((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
 static void mpi3mr_map_queues(struct Scsi_Host *shost)
 #else
 static int mpi3mr_map_queues(struct Scsi_Host *shost)
@@ -4389,14 +4397,16 @@ static int mpi3mr_map_queues(struct Scsi_Host *shost)
 		offset += map->nr_queues;
 	}
 #if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || \
-    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)))
+    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 2)) || \
+	(defined(CONFIG_SUSE_KERNEL) && \
+	((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
 	return;
 #else
 	return 0;
 #endif
 }
-#endif
 
+#endif
 
 /**
  * mpi3mr_print_pending_host_io - print pending I/Os
@@ -5532,12 +5542,15 @@ static struct scsi_host_template mpi3mr_driver_template = {
 #if (KERNEL_VERSION(5, 3, 0) <= LINUX_VERSION_CODE)
 	.max_segment_size		= 0xffffffff,
 #endif
-#if (KERNEL_VERSION(5, 16, 0) > LINUX_VERSION_CODE)
-	.shost_attrs			= mpi3mr_host_attrs,
-	.sdev_attrs			= mpi3mr_dev_attrs,
-#else
+
+#if ((KERNEL_VERSION(5, 16, 0) <= LINUX_VERSION_CODE) || \
+	(defined(CONFIG_SUSE_KERNEL) && \
+	((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
 	.shost_groups			= mpi3mr_host_groups,
 	.sdev_groups			= mpi3mr_dev_groups,
+#else
+	.shost_attrs			= mpi3mr_host_attrs,
+	.sdev_attrs			= mpi3mr_dev_attrs,
 #endif
 	.track_queue_depth		= 1,
 	.cmd_size			= sizeof(struct scmd_priv),
