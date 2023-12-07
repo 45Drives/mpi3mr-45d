@@ -3789,15 +3789,6 @@ static DEVICE_ATTR_RO(slot);
 #if ((KERNEL_VERSION(5, 16, 0) <= LINUX_VERSION_CODE) || \
 	(defined(CONFIG_SUSE_KERNEL) && \
 	((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
-struct device_attribute *mpi3mr_dev_attrs[] = {
-	&dev_attr_sata_ncq_prio_enable,
-	&dev_attr_sas_address,
-	&dev_attr_device_handle,
-	&dev_attr_persistent_id,
-	&dev_attr_slot,
-	NULL,
-};
-#else
 static struct attribute *mpi3mr_dev_attrs[] = {
 	&dev_attr_sata_ncq_prio_enable.attr,
 	&dev_attr_sas_address.attr,
@@ -3823,6 +3814,7 @@ struct device_attribute *mpi3mr_dev_attrs[] = {
 	&dev_attr_sas_address,
 	&dev_attr_device_handle,
 	&dev_attr_persistent_id,
+	&dev_attr_slot,
 	NULL,
 };
 
