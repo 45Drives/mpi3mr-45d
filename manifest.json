@@ -2,7 +2,7 @@
     "__version": "45D-R2",
     "name": "mpi3mr-dkms",
     "title": "mpi3mr",
-    "prerelease": true,
+    "prerelease": false,
     "version": "8.7.1.0.0",
     "buildVersion": "45d3",
     "author": "Joshua Boudreau <jboudreau@45drives.com>",
