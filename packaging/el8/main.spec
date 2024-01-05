@@ -11,7 +11,7 @@ Requires: ::package_dependencies_el_el8::
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %global PACKAGE_NAME mpi3mr
-%global PACKAGE_VERSION 8.5.1.0.0-45d
+%global PACKAGE_VERSION ::package_version::-45d
 
 %description
 ::package_title::
@@ -45,6 +45,8 @@ rm -rf %{buildroot}
 exit 0
 
 %changelog
+* Fri Jan 05 2024 Joshua Boudreau <jboudreau@45drives.com> 8.7.1.0.0-45d4
+- Fix dkms build for rocky
 * Thu Dec 07 2023 Joshua Boudreau <jboudreau@45drives.com> 8.7.1.0.0-45d3
 - fix generated patch
 * Thu Dec 07 2023 Joshua Boudreau <jboudreau@45drives.com> 8.7.1.0.0-45d2
