@@ -14,7 +14,7 @@ DKMS package of the mpi3mr driver, patched to expose slot number for array devic
 1. `git checkout upstream`
 2. Download latest driver version from broadcom
 3. Navigate through nested archives and open `mpi3mr-<driver version>-src.tar.gz`
-4. Extract contents and copy files to repo in `upstream` branch
+4. Extract contents and copy files to repo in `upstream` branch and commit them
 5. `git checkout patched`
 6. `git merge upstream` and handle conflicts
 7. `git checkout main`
