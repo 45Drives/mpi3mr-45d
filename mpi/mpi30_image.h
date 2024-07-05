@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- *  Copyright 2016-2023 Broadcom Inc. All rights reserved.
+ *  Copyright 2016-2024 Broadcom Inc. All rights reserved.
  */
 #ifndef MPI30_IMAGE_H
 #define MPI30_IMAGE_H     1
@@ -138,6 +138,7 @@ struct mpi3_ci_manifest_mpi {
 #define MPI3_CI_MANIFEST_MPI_RELEASE_LEVEL_RC                         (0x40)
 #define MPI3_CI_MANIFEST_MPI_RELEASE_LEVEL_GCA                        (0x50)
 #define MPI3_CI_MANIFEST_MPI_RELEASE_LEVEL_POINT                      (0x60)
+#define MPI3_CI_MANIFEST_MPI_RELEASE_LEVEL_DIAG                       (0xf0)
 #define MPI3_CI_MANIFEST_MPI_FLAGS_DIAG_AUTHORIZATION                 (0x01)
 #define MPI3_CI_MANIFEST_MPI_SUBSYSTEMID_IGNORED                   (0xffff)
 #define MPI3_CI_MANIFEST_MPI_PKG_VER_STR_OFF_UNSPECIFIED           (0x00000000)
@@ -190,16 +191,17 @@ struct mpi3_supported_devices_data {
 	__le32                     reserved04;
 	struct mpi3_supported_device   supported_device[MPI3_SUPPORTED_DEVICE_MAX];
 };
-#ifndef MPI3_ENCRYPTED_HASH_MAX
-#define MPI3_ENCRYPTED_HASH_MAX                      (1)
+#ifndef MPI3_PUBLIC_KEY_MAX
+#define MPI3_PUBLIC_KEY_MAX                          (1)
 #endif
 struct mpi3_encrypted_hash_entry {
 	u8                         hash_image_type;
 	u8                         hash_algorithm;
 	u8                         encryption_algorithm;
 	u8                         reserved03;
-	__le32                     reserved04;
-	__le32                     encrypted_hash[MPI3_ENCRYPTED_HASH_MAX];
+	__le16                     public_key_size;
+	__le16                     signature_size;
+	__le32                     public_key[MPI3_PUBLIC_KEY_MAX];
 };
 #define MPI3_HASH_IMAGE_TYPE_KEY_WITH_SIGNATURE      (0x03)
 #define MPI3_HASH_ALGORITHM_VERSION_MASK             (0xe0)
@@ -222,17 +224,6 @@ struct mpi3_encrypted_hash_entry {
 #define MPI3_ENCRYPTION_ALGORITHM_ECDSA_P256         (0x07)
 #define MPI3_ENCRYPTION_ALGORITHM_ECDSA_P384         (0x08)
 #define MPI3_ENCRYPTION_ALGORITHM_ECDSA_P521         (0x09)
-#ifndef MPI3_PUBLIC_KEY_MAX
-#define MPI3_PUBLIC_KEY_MAX                          (1)
-#endif
-struct mpi3_encrypted_key_with_hash_entry {
-	u8                         hash_image_type;
-	u8                         hash_algorithm;
-	u8                         encryption_algorithm;
-	u8                         reserved03;
-	__le32                     reserved04;
-	__le32                     public_key[MPI3_PUBLIC_KEY_MAX];
-};
 #ifndef MPI3_ENCRYPTED_HASH_ENTRY_MAX
 #define MPI3_ENCRYPTED_HASH_ENTRY_MAX               (1)
 #endif
