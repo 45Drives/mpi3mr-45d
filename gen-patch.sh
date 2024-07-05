@@ -3,7 +3,12 @@
 set -Eeuo pipefail
 
 mkdir -p patches
-git diff upstream patched -p > patches/45drives.patch
+
+echo Generating patch...
+
+git diff upstream patched -p | tee patches/45drives.patch
+
+echo Updating dkms.conf...
 
 DRIVER_VERSION=$(awk '/^#define MPI3MR_DRIVER_VERSION/{ print $3 }' <(git show patched:mpi3mr.h))
 if [ -z "$DRIVER_VERSION" ]; then
