@@ -2,7 +2,7 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2023 Broadcom Inc.
+ * Copyright (C) 2017-2024 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
@@ -10,7 +10,7 @@
 #include "mpi3mr.h"
 #include "mpi3mr_app.h"
 
-int poll_queues;
+static int poll_queues;
 module_param(poll_queues, int, 0444);
 #if (KERNEL_VERSION(5, 13, 0) <= LINUX_VERSION_CODE)
 MODULE_PARM_DESC(poll_queues, "Number of queues for io_uring poll mode. (Range 1 - 126)");
@@ -559,10 +559,9 @@ static void mpi3mr_process_admin_reply_desc(struct mpi3mr_ioc *mrioc,
 		status_desc = (struct mpi3_status_reply_descriptor *)reply_desc;
 		host_tag = le16_to_cpu(status_desc->host_tag);
 		ioc_status = le16_to_cpu(status_desc->ioc_status);
-		if (ioc_status &
-		    MPI3_REPLY_DESCRIPT_STATUS_IOCSTATUS_LOGINFOAVAIL)
+		if (ioc_status & MPI3_IOCSTATUS_LOG_INFO_AVAILABLE)
 			ioc_loginfo = le32_to_cpu(status_desc->ioc_log_info);
-		ioc_status &= MPI3_REPLY_DESCRIPT_STATUS_IOCSTATUS_STATUS_MASK;
+		ioc_status &= MPI3_IOCSTATUS_STATUS_MASK;
 		mpi3mr_reply_trigger(mrioc, ioc_status, ioc_loginfo);
 		break;
 	case MPI3_REPLY_DESCRIPT_FLAGS_TYPE_ADDRESS_REPLY:
@@ -573,10 +572,9 @@ static void mpi3mr_process_admin_reply_desc(struct mpi3mr_ioc *mrioc,
 			goto out;
 		host_tag = le16_to_cpu(def_reply->host_tag);
 		ioc_status = le16_to_cpu(def_reply->ioc_status);
-		if (ioc_status &
-		    MPI3_REPLY_DESCRIPT_STATUS_IOCSTATUS_LOGINFOAVAIL)
+		if (ioc_status & MPI3_IOCSTATUS_LOG_INFO_AVAILABLE)
 			ioc_loginfo = le32_to_cpu(def_reply->ioc_log_info);
-		ioc_status &= MPI3_REPLY_DESCRIPT_STATUS_IOCSTATUS_STATUS_MASK;
+		ioc_status &= MPI3_IOCSTATUS_STATUS_MASK;
 		if (def_reply->function == MPI3_FUNCTION_SCSI_IO) {
 			scsi_reply = (struct mpi3_scsi_io_reply *)def_reply;
 			sense_buf = mpi3mr_get_sensebuf_virt_addr(mrioc,
@@ -1682,9 +1680,9 @@ static inline void mpi3mr_clear_reset_history(struct mpi3mr_ioc *mrioc)
  * Return: 0 on success, -1 on failure.
  */
 static int mpi3mr_issue_and_process_mur(struct mpi3mr_ioc *mrioc,
-    u32 reset_reason)
+    u16 reset_reason)
 {
-	u32 ioc_config, timeout, ioc_status;
+	u32 ioc_config, timeout, ioc_status, scratch_pad0;
 	int retval = -1;
 
 	ioc_info(mrioc, "issuing message unit reset(MUR)\n");
@@ -1693,7 +1691,11 @@ static int mpi3mr_issue_and_process_mur(struct mpi3mr_ioc *mrioc,
 		return retval;
 	}
 	mpi3mr_clear_reset_history(mrioc);
-	writel(reset_reason, &mrioc->sysif_regs->scratchpad[0]);
+	scratch_pad0 = ((MPI3MR_RESET_REASON_OSTYPE_LINUX <<
+			 MPI3MR_RESET_REASON_OSTYPE_SHIFT) |
+			(mrioc->facts.ioc_num <<
+			 MPI3MR_RESET_REASON_IOCNUM_SHIFT) | reset_reason);
+	writel(scratch_pad0, &mrioc->sysif_regs->scratchpad[0]);
 	ioc_config = readl(&mrioc->sysif_regs->ioc_configuration);
 	ioc_config &= ~MPI3_SYSIF_IOC_CONFIG_ENABLE_IOC;
 	writel(ioc_config, &mrioc->sysif_regs->ioc_configuration);
@@ -1799,11 +1801,11 @@ static inline void mpi3mr_set_diagsave(struct mpi3mr_ioc *mrioc)
  * Return: 0 on success, non-zero on failure.
  */
 static int mpi3mr_issue_reset(struct mpi3mr_ioc *mrioc, u16 reset_type,
-    u32 reset_reason)
+    u16 reset_reason)
 {
 	int retval = -1;
 	u8 unlock_retry_count = 0;
-	u32 host_diagnostic, ioc_status, ioc_config;
+	u32 host_diagnostic, ioc_status, ioc_config, scratch_pad0;
 	u32 timeout = MPI3MR_RESET_ACK_TIMEOUT * 10;
 
 	if ((reset_type != MPI3_SYSIF_HOST_DIAG_RESET_ACTION_SOFT_RESET) &&
@@ -1856,7 +1858,10 @@ static int mpi3mr_issue_reset(struct mpi3mr_ioc *mrioc, u16 reset_type,
 		    unlock_retry_count, host_diagnostic);
 	} while (!(host_diagnostic & MPI3_SYSIF_HOST_DIAG_DIAG_WRITE_ENABLE));
 
-	writel(reset_reason, &mrioc->sysif_regs->scratchpad[0]);
+	scratch_pad0 = ((MPI3MR_RESET_REASON_OSTYPE_LINUX <<
+	    MPI3MR_RESET_REASON_OSTYPE_SHIFT) | (mrioc->facts.ioc_num <<
+	    MPI3MR_RESET_REASON_IOCNUM_SHIFT) | reset_reason);
+	writel(scratch_pad0, &mrioc->sysif_regs->scratchpad[0]);
 	writel(host_diagnostic | reset_type,
 	    &mrioc->sysif_regs->host_diagnostic);
 	switch (reset_type) {
@@ -2396,7 +2401,7 @@ static void mpi3mr_watchdog_work(struct work_struct *work)
 	unsigned long flags;
 	enum mpi3mr_iocstate ioc_state;
 	u32 host_diagnostic, ioc_status;
-	u32 reset_reason = MPI3MR_RESET_FROM_FAULT_WATCH;
+	u16 reset_reason = MPI3MR_RESET_FROM_FAULT_WATCH;
 	union mpi3mr_trigger_data trigger_data;
 
 	if (mrioc->reset_in_progress || mrioc->pcie_err_recovery)
@@ -3771,6 +3776,9 @@ static int mpi3mr_issue_iocinit(struct mpi3mr_ioc *mrioc)
 	current_time = ktime_get_real();
 	iocinit_req.time_stamp = cpu_to_le64(ktime_to_ms(current_time));
 
+	iocinit_req.msg_flags =
+		MPI3_IOCINIT_MSGFLAGS_WRITESAMEDIVERT_SUPPORTED;
+
 	if (enable_dix)
 		iocinit_req.msg_flags |=
 		    MPI3_IOCINIT_MSGFLAGS_HOSTMETADATA_SEPARATED;
@@ -4141,8 +4149,8 @@ static const struct {
 	u32 capability;
 	char *name;
 } mpi3mr_capabilities[] = {
-	{ MPI3_IOCFACTS_CAPABILITY_RAID_CAPABLE, "RAID" },
-	{ MPI3_IOCFACTS_CAPABILITY_MULTIPATH_ENABLED, "MultiPath" },
+	{ MPI3_IOCFACTS_CAPABILITY_RAID_SUPPORTED, "RAID" },
+	{ MPI3_IOCFACTS_CAPABILITY_MULTIPATH_SUPPORTED, "MultiPath" },
 };
 
 /**
@@ -4423,7 +4431,7 @@ int mpi3mr_setup_resources(struct mpi3mr_ioc *mrioc)
 	ioc_info(mrioc, "iomem(0x%016llx), mapped(0x%p), size(%d)\n",
 	    (unsigned long long)mrioc->sysif_regs_phys,
 	    mrioc->sysif_regs, memap_sz);
-	ioc_info(mrioc, "number of MSI-X vectors found in capabilities: (%d)\n",
+	ioc_info(mrioc, "number of MSI-X vectors found in capabilities:%d\n",
 	    mrioc->msix_count);
 
 #if (KERNEL_VERSION(5, 12, 0) <= LINUX_VERSION_CODE)
@@ -4587,7 +4595,7 @@ mpi3mr_revalidate_factsdata(struct mpi3mr_ioc *mrioc)
 		    mrioc->facts.max_data_length);
 
 	if ((mrioc->sas_transport_enabled) && (mrioc->facts.ioc_capabilities &
-	      MPI3_IOCFACTS_CAPABILITY_MULTIPATH_ENABLED))
+	      MPI3_IOCFACTS_CAPABILITY_MULTIPATH_SUPPORTED))
 		ioc_err(mrioc,
 		    "critical error: multipath capability is enabled at the "
 		    "controller while sas transport support is enabled at the "
@@ -4733,7 +4741,7 @@ static int mpi3mr_bring_ioc_ready(struct mpi3mr_ioc *mrioc)
 		if (ioc_state == MRIOC_STATE_READY)
 		{
 			ioc_info(mrioc,
-			    "successfully transistioned to %s state\n",
+			    "successfully transitioned to %s state\n",
 			    mpi3mr_iocstate_name(ioc_state));
 			return 0;
 		}
@@ -4847,7 +4855,7 @@ retry_init:
 	mrioc->max_host_ios = mrioc->facts.max_reqs - MPI3MR_INTERNALCMDS_RESVD;
 	mrioc->shost->max_sectors = mrioc->facts.max_data_length / 512;
 	if (!(mrioc->facts.ioc_capabilities &
-	      MPI3_IOCFACTS_CAPABILITY_MULTIPATH_ENABLED)) {
+	      MPI3_IOCFACTS_CAPABILITY_MULTIPATH_SUPPORTED)) {
 		mrioc->sas_transport_enabled = 1;
 		mrioc->scsi_device_channel = 1;
 		mrioc->shost->max_channel = 1;
@@ -6005,7 +6013,7 @@ cleanup_drv_cmd:
  * Return: 0 on success, non-zero on failure.
  */
 int mpi3mr_soft_reset_handler(struct mpi3mr_ioc *mrioc,
-	u32 reset_reason, u8 snapdump)
+	u16 reset_reason, u8 snapdump)
 {
 	int retval = 0, i;
 	unsigned long flags;
@@ -6161,6 +6169,7 @@ out:
 		mrioc->device_refresh_on = 0;
 		mrioc->unrecoverable = 1;
 		mrioc->reset_in_progress = 0;
+		mrioc->block_bsgs = 0;
 		retval = -1;
 		mpi3mr_flush_cmds_for_unrecovered_controller(mrioc);
 	}

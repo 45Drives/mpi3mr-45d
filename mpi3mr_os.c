@@ -2,7 +2,7 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2023 Broadcom Inc.
+ * Copyright (C) 2017-2024 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
@@ -1778,7 +1778,7 @@ mpi3mr_sastopochg_evt_debug(struct mpi3mr_ioc *mrioc,
 		if (!handle)
 			continue;
 		phy_number = event_data->start_phy_num + i;
-		reason_code = event_data->phy_entry[i].status &
+		reason_code = event_data->phy_entry[i].phy_status &
 		    MPI3_EVENT_SAS_TOPO_PHY_RC_MASK;
 		switch (reason_code) {
 		case MPI3_EVENT_SAS_TOPO_PHY_RC_TARG_NOT_RESPONDING:
@@ -1864,7 +1864,7 @@ static void mpi3mr_sastopochg_evt_bh(struct mpi3mr_ioc *mrioc,
 		if (!tgtdev)
 			continue;
 
-		reason_code = event_data->phy_entry[i].status &
+		reason_code = event_data->phy_entry[i].phy_status &
 		    MPI3_EVENT_SAS_TOPO_PHY_RC_MASK;
 
 		switch (reason_code) {
@@ -2834,7 +2834,7 @@ static void mpi3mr_sastopochg_evt_th(struct mpi3mr_ioc *mrioc,
 		handle = le16_to_cpu(topo_evt->phy_entry[i].attached_dev_handle);
 		if (!handle)
 			continue;
-		reason_code = topo_evt->phy_entry[i].status &
+		reason_code = topo_evt->phy_entry[i].phy_status &
 		    MPI3_EVENT_SAS_TOPO_PHY_RC_MASK;
 		scsi_tgt_priv_data =  NULL;
 		tgtdev = mpi3mr_get_tgtdev_by_handle(mrioc, handle);
@@ -3577,10 +3577,9 @@ void mpi3mr_process_op_reply_desc(struct mpi3mr_ioc *mrioc,
 		status_desc = (struct mpi3_status_reply_descriptor *)reply_desc;
 		host_tag = le16_to_cpu(status_desc->host_tag);
 		ioc_status = le16_to_cpu(status_desc->ioc_status);
-		if (ioc_status &
-		    MPI3_REPLY_DESCRIPT_STATUS_IOCSTATUS_LOGINFOAVAIL)
+		if (ioc_status & MPI3_IOCSTATUS_LOG_INFO_AVAILABLE)
 			ioc_loginfo = le32_to_cpu(status_desc->ioc_log_info);
-		ioc_status &= MPI3_REPLY_DESCRIPT_STATUS_IOCSTATUS_STATUS_MASK;
+		ioc_status &= MPI3_IOCSTATUS_STATUS_MASK;
 		mpi3mr_reply_trigger(mrioc, ioc_status, ioc_loginfo);
 		break;
 	case MPI3_REPLY_DESCRIPT_FLAGS_TYPE_ADDRESS_REPLY:
@@ -3604,10 +3603,9 @@ void mpi3mr_process_op_reply_desc(struct mpi3mr_ioc *mrioc,
 		resp_data = le32_to_cpu(scsi_reply->response_data);
 		sense_buf = mpi3mr_get_sensebuf_virt_addr(mrioc,
 		    le64_to_cpu(scsi_reply->sense_data_buffer_address));
-		if (ioc_status &
-		    MPI3_REPLY_DESCRIPT_STATUS_IOCSTATUS_LOGINFOAVAIL)
+		if (ioc_status & MPI3_IOCSTATUS_LOG_INFO_AVAILABLE)
 			ioc_loginfo = le32_to_cpu(scsi_reply->ioc_log_info);
-		ioc_status &= MPI3_REPLY_DESCRIPT_STATUS_IOCSTATUS_STATUS_MASK;
+		ioc_status &= MPI3_IOCSTATUS_STATUS_MASK;
 		if (sense_state == MPI3_SCSI_STATE_SENSE_BUFF_Q_EMPTY)
 			ioc_err(mrioc,
 			    "controller cannot transfer sense data due to empty sense buffer queue\n");
@@ -5485,7 +5483,7 @@ static int mpi3mr_qcmd(struct Scsi_Host *shost,
 		    MPI3_SCSIIO_MSGFLAGS_DIVERT_TO_FIRMWARE;
 		scsiio_flags |= MPI3_SCSIIO_FLAGS_DIVERT_REASON_IO_THROTTLING;
 	}
-	scsiio_req->flags = cpu_to_le32(scsiio_flags);
+	scsiio_req->flags |= cpu_to_le32(scsiio_flags);
 
 	if (mpi3mr_op_request_post(mrioc, op_req_q,
 	    scmd_priv_data->mpi3mr_scsiio_req)) {

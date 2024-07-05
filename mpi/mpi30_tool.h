@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- *  Copyright 2016-2023 Broadcom Inc. All rights reserved.
+ *  Copyright 2016-2024 Broadcom Inc. All rights reserved.
  */
 #ifndef MPI30_TOOL_H
 #define MPI30_TOOL_H     1
@@ -218,6 +218,7 @@ struct mpi3_diag_buffer_post_request {
 #define MPI3_DIAG_BUFFER_TYPE_FW                            (0x02)
 #define MPI3_DIAG_BUFFER_TYPE_DRIVER                        (0x10)
 #define MPI3_DIAG_BUFFER_TYPE_FDL                           (0x20)
+#define MPI3_DIAG_BUFFER_TYPE_TTY                           (0x30)
 #define MPI3_DIAG_BUFFER_MIN_PRODUCT_SPECIFIC               (0xf0)
 #define MPI3_DIAG_BUFFER_MAX_PRODUCT_SPECIFIC               (0xff)
 struct mpi3_driver_buffer_header {

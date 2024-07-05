@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- *  Copyright 2016-2023 Broadcom Inc. All rights reserved.
+ *  Copyright 2016-2024 Broadcom Inc. All rights reserved.
  */
 #ifndef MPI30_INIT_H
 #define MPI30_INIT_H     1
@@ -26,7 +26,7 @@ struct mpi3_scsi_io_request {
 	__le16                     change_count;
 	__le16                     dev_handle;
 	__le32                     flags;
-	__le32                     io_use_only10;
+	__le32                     ioc_use_only10;
 	__le32                     data_length;
 	u8                         lun[8];
 	union mpi3_scsi_io_cdb_union  cdb;
@@ -39,6 +39,7 @@ struct mpi3_scsi_io_request {
 #define MPI3_SCSIIO_FLAGS_CDB_GREATER_THAN_16                 (0x20000000)
 #define MPI3_SCSIIO_FLAGS_CDB_IN_SEPARATE_BUFFER              (0x40000000)
 #define MPI3_SCSIIO_FLAGS_CDB_PRODUCT_SPECIFIC                (0x60000000)
+#define MPI3_SCSIIO_FLAGS_IOC_USE_ONLY_27_MASK                (0x18000000)
 #define MPI3_SCSIIO_FLAGS_TASKATTRIBUTE_MASK                  (0x07000000)
 #define MPI3_SCSIIO_FLAGS_TASKATTRIBUTE_SIMPLEQ               (0x00000000)
 #define MPI3_SCSIIO_FLAGS_TASKATTRIBUTE_HEADOFQ               (0x01000000)
