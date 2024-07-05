@@ -20,5 +20,5 @@ DKMS package of the mpi3mr driver, patched to expose slot number for array devic
 7. `git checkout main`
 8. `git merge upstream` (should *not* have any conflicts)
 9. `./gen-patch.sh`
-10. Update `PACKAGE_VERSION` in dkms.conf
-11. `manup` update the version/build
+10. ~~Update `PACKAGE_VERSION` in dkms.conf~~ done by `./gen-patch.sh`
+11. ~~`manup` update the version/build~~ done by `./gen-patch.sh`
