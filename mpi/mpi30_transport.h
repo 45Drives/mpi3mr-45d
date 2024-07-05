@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- *  Copyright 2016-2023 Broadcom Inc. All rights reserved.
+ *  Copyright 2016-2024 Broadcom Inc. All rights reserved.
  */
 #ifndef MPI30_TRANSPORT_H
 #define MPI30_TRANSPORT_H     1
@@ -16,7 +16,7 @@ union mpi3_version_union {
 };
 #define MPI3_VERSION_MAJOR                                              (3)
 #define MPI3_VERSION_MINOR                                              (0)
-#define MPI3_VERSION_UNIT                                               (30)
+#define MPI3_VERSION_UNIT                                               (31)
 #define MPI3_VERSION_DEV                                                (0)
 #define MPI3_DEVHANDLE_INVALID                                          (0xffff)
 struct mpi3_sysif_oper_queue_indexes {
@@ -237,12 +237,6 @@ struct mpi3_status_reply_descriptor {
 	__le16             host_tag;
 	__le16             reply_flags;
 };
-#define MPI3_REPLY_DESCRIPT_STATUS_IOCSTATUS_LOGINFOAVAIL               (0x8000)
-#define MPI3_REPLY_DESCRIPT_STATUS_IOCSTATUS_STATUS_MASK                (0x7fff)
-#define MPI3_REPLY_DESCRIPT_STATUS_IOCLOGINFO_TYPE_MASK                 (0xf0000000)
-#define MPI3_REPLY_DESCRIPT_STATUS_IOCLOGINFO_TYPE_NO_INFO              (0x00000000)
-#define MPI3_REPLY_DESCRIPT_STATUS_IOCLOGINFO_TYPE_SAS                  (0x30000000)
-#define MPI3_REPLY_DESCRIPT_STATUS_IOCLOGINFO_DATA_MASK                 (0x0fffffff)
 union mpi3_reply_descriptors_union {
 	struct mpi3_default_reply_descriptor               default_reply;
 	struct mpi3_address_reply_descriptor               address_reply;
@@ -380,7 +374,6 @@ struct mpi3_default_reply {
 #define MPI3_FUNCTION_MAX_IOC_USE_ONLY              (0xef)
 #define MPI3_FUNCTION_MIN_PRODUCT_SPECIFIC          (0xf0)
 #define MPI3_FUNCTION_MAX_PRODUCT_SPECIFIC          (0xff)
-#define MPI3_IOCSTATUS_LOG_INFO_AVAIL_MASK          (0x8000)
 #define MPI3_IOCSTATUS_LOG_INFO_AVAILABLE           (0x8000)
 #define MPI3_IOCSTATUS_STATUS_MASK                  (0x7fff)
 #define MPI3_IOCSTATUS_SUCCESS                      (0x0000)

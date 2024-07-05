@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- *  Copyright 2016-2023 Broadcom Inc. All rights reserved.
+ *  Copyright 2016-2024 Broadcom Inc. All rights reserved.
  */
 #ifndef MPI30_CNFG_H
 #define MPI30_CNFG_H     1
@@ -303,6 +303,7 @@ struct mpi3_man6_gpio_entry {
 #define MPI3_MAN6_GPIO_EXTINT_PARAM1_FLAGS_SOURCE_GENERIC                     (0x00)
 #define MPI3_MAN6_GPIO_EXTINT_PARAM1_FLAGS_SOURCE_CABLE_MGMT                  (0x10)
 #define MPI3_MAN6_GPIO_EXTINT_PARAM1_FLAGS_SOURCE_ACTIVE_CABLE_OVERCURRENT    (0x20)
+#define MPI3_MAN6_GPIO_EXTINT_PARAM1_FLAGS_ACK_REQUIRED                       (0x02)
 #define MPI3_MAN6_GPIO_EXTINT_PARAM1_FLAGS_TRIGGER_MASK                       (0x01)
 #define MPI3_MAN6_GPIO_EXTINT_PARAM1_FLAGS_TRIGGER_EDGE                       (0x00)
 #define MPI3_MAN6_GPIO_EXTINT_PARAM1_FLAGS_TRIGGER_LEVEL                      (0x01)
@@ -851,6 +852,14 @@ struct mpi3_man_page21 {
 #define MPI3_MAN21_FLAGS_SES_VPD_ASSOC_MASK                          (0x00000001)
 #define MPI3_MAN21_FLAGS_SES_VPD_ASSOC_DEFAULT                       (0x00000000)
 #define MPI3_MAN21_FLAGS_SES_VPD_ASSOC_OEM_SPECIFIC                  (0x00000001)
+struct mpi3_man_page22 {
+	struct mpi3_config_page_header         header;
+	__le32                             reserved08;
+	__le16                             num_eui64;
+	__le16                             reserved0e;
+	__le64                             base_eui64;
+};
+#define MPI3_MAN22_PAGEVERSION                                       (0x00)
 #ifndef MPI3_MAN_PROD_SPECIFIC_MAX
 #define MPI3_MAN_PROD_SPECIFIC_MAX                      (1)
 #endif
@@ -901,16 +910,23 @@ struct mpi3_io_unit_page2 {
 #define MPI3_IOUNIT2_GPIO_SETTING_MASK          (0x0001)
 #define MPI3_IOUNIT2_GPIO_SETTING_OFF           (0x0000)
 #define MPI3_IOUNIT2_GPIO_SETTING_ON            (0x0001)
+enum mpi3_iounit3_threshold {
+	MPI3_IOUNIT3_THRESHOLD_WARNING              = 0,
+	MPI3_IOUNIT3_THRESHOLD_CRITICAL             = 1,
+	MPI3_IOUNIT3_THRESHOLD_FATAL                = 2,
+	MPI3_IOUNIT3_THRESHOLD_LOW                  = 3,
+	MPI3_IOUNIT3_NUM_THRESHOLDS
+};
 struct mpi3_io_unit3_sensor {
 	__le16             flags;
 	u8                 threshold_margin;
 	u8                 reserved03;
-	__le16             threshold[3];
-	__le16             reserved0a;
+	__le16             threshold[MPI3_IOUNIT3_NUM_THRESHOLDS];
 	__le32             reserved0c;
 	__le32             reserved10;
 	__le32             reserved14;
 };
+#define MPI3_IOUNIT3_SENSOR_FLAGS_LOW_THRESHOLD_VALID           (0x0020)
 #define MPI3_IOUNIT3_SENSOR_FLAGS_FATAL_EVENT_ENABLED           (0x0010)
 #define MPI3_IOUNIT3_SENSOR_FLAGS_FATAL_ACTION_ENABLED          (0x0008)
 #define MPI3_IOUNIT3_SENSOR_FLAGS_CRITICAL_EVENT_ENABLED        (0x0004)
@@ -1318,6 +1334,8 @@ struct mpi3_driver_page0 {
 	__le32                             reserved18;
 };
 #define MPI3_DRIVER0_PAGEVERSION                                    (0x00)
+#define MPI3_DRIVER0_BSDOPTS_DEVICEEXPOSURE_DISABLE                 (0x00000020)
+#define MPI3_DRIVER0_BSDOPTS_WRITECACHE_DISABLE                     (0x00000010)
 #define MPI3_DRIVER0_BSDOPTS_HEADLESS_MODE_ENABLE                   (0x00000008)
 #define MPI3_DRIVER0_BSDOPTS_DIS_HII_CONFIG_UTIL                    (0x00000004)
 #define MPI3_DRIVER0_BSDOPTS_REGISTRATION_MASK                      (0x00000003)
@@ -1437,11 +1455,6 @@ union mpi3_security_nonce {
 	__le16                             word[32];
 	u8                                 byte[64];
 };
-union mpi3_security_root_digest {
-	__le32                             dword[16];
-	__le16                             word[32];
-	u8                                 byte[64];
-};
 union mpi3_security0_cert_chain {
 	__le32                             dword[1024];
 	__le16                             word[2048];
@@ -1512,13 +1525,20 @@ struct mpi3_security_page1 {
 #ifndef MPI3_SECURITY2_TRUSTED_ROOT_MAX
 #define MPI3_SECURITY2_TRUSTED_ROOT_MAX      1
 #endif
+#ifndef MPI3_SECURITY2_ROOT_LEN
+#define MPI3_SECURITY2_ROOT_LEN      4
+#endif
 struct mpi3_security2_trusted_root {
 	u8                                 level;
 	u8                                 hash_algorithm;
 	__le16                             trusted_root_flags;
 	__le32                             reserved04[3];
-	union mpi3_security_root_digest       root_digest;
+	u8                                 root[MPI3_SECURITY2_ROOT_LEN];
 };
+#define MPI3_SECURITY2_TRUSTEDROOT_TRUSTEDROOTFLAGS_ROOTFORM_MASK                  (0xf000)
+#define MPI3_SECURITY2_TRUSTEDROOT_TRUSTEDROOTFLAGS_ROOTFORM_SHIFT                 (12)
+#define MPI3_SECURITY2_TRUSTEDROOT_TRUSTEDROOTFLAGS_ROOTFORM_DIGEST                (0x0000)
+#define MPI3_SECURITY2_TRUSTEDROOT_TRUSTEDROOTFLAGS_ROOTFORM_DERCERT               (0x1000)
 #define MPI3_SECURITY2_TRUSTEDROOT_TRUSTEDROOTFLAGS_HASHALGOSOURCE_MASK            (0x0006)
 #define MPI3_SECURITY2_TRUSTEDROOT_TRUSTEDROOTFLAGS_HASHALGOSOURCE_SHIFT           (1)
 #define MPI3_SECURITY2_TRUSTEDROOT_TRUSTEDROOTFLAGS_HASHALGOSOURCE_HA_FIELD        (0x0000)
@@ -1531,7 +1551,8 @@ struct mpi3_security_page2 {
 	union mpi3_security_nonce             nonce;
 	__le32                             reserved90[3];
 	u8                                 num_roots;
-	u8                                 reserved9d[3];
+	u8                                 reserved9d;
+	__le16                             root_element_size;
 	struct mpi3_security2_trusted_root     trusted_root[MPI3_SECURITY2_TRUSTED_ROOT_MAX];
 };
 #define MPI3_SECURITY2_PAGEVERSION               (0x00)
@@ -2184,7 +2205,8 @@ struct mpi3_enclosure_page0 {
 	__le16                             sep_dev_handle;
 	u8                                 chassis_slot;
 	u8                                 reserved1d[3];
-	__le32                             receptacle_ids;
+	__le32                             receptacle_i_ds;
+	__le32                             reserved24;
 };
 #define MPI3_ENCLOSURE0_PAGEVERSION                     (0x00)
 #define MPI3_ENCLS0_FLAGS_ENCL_TYPE_MASK                (0xc000)

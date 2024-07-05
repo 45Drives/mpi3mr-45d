@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- *  Copyright 2016-2023 Broadcom Inc. All rights reserved.
+ *  Copyright 2016-2024 Broadcom Inc. All rights reserved.
  */
 #ifndef MPI30_TARG_H
 #define MPI30_TARG_H     1
@@ -120,6 +120,8 @@ struct mpi3_target_assist_request {
 	union mpi3_sge_union          sgl[5];
 };
 #define MPI3_TARGET_ASSIST_MSGFLAGS_METASGL_VALID           (0x80)
+#define MPI3_TARGET_ASSIST_FLAGS_IOC_USE_ONLY_23_MASK       (0x00800000)
+#define MPI3_TARGET_ASSIST_FLAGS_IOC_USE_ONLY_22_MASK       (0x00400000)
 #define MPI3_TARGET_ASSIST_FLAGS_REPOST_CMD_BUFFER          (0x00200000)
 #define MPI3_TARGET_ASSIST_FLAGS_AUTO_STATUS                (0x00100000)
 #define MPI3_TARGET_ASSIST_FLAGS_DATADIRECTION_MASK         (0x000c0000)
@@ -147,6 +149,7 @@ struct mpi3_target_status_send_request {
 	__le32                     ioc_use_only30[4];
 	union mpi3_sge_union          sgl;
 };
+#define MPI3_TSS_FLAGS_IOC_USE_ONLY_6_MASK              (0x0040)
 #define MPI3_TSS_FLAGS_REPOST_CMD_BUFFER                (0x0020)
 #define MPI3_TSS_FLAGS_AUTO_SEND_GOOD_STATUS            (0x0010)
 struct mpi3_target_standard_reply {
