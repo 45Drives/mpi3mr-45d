@@ -1,3 +1,3 @@
-## mpi3mr 8.7.1.0.0-45d4
+## mpi3mr 8.9.1.0.0-45d1
 
-* Fix dkms build for rocky
+* Update upstream driver to 8.9.1.0.0

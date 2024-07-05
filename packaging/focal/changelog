@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.9.1.0.0-45d1focal) focal; urgency=medium
+
+  * Update upstream driver to 8.9.1.0.0
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 05 Jul 2024 13:49:43 -0300
+
 mpi3mr-dkms (8.7.1.0.0-45d4focal) focal; urgency=medium
 
   * Fix dkms build for rocky

@@ -45,6 +45,8 @@ rm -rf %{buildroot}
 exit 0
 
 %changelog
+* Fri Jul 05 2024 Joshua Boudreau <jboudreau@45drives.com> 8.9.1.0.0-45d1
+- Update upstream driver to 8.9.1.0.0
 * Fri Jan 05 2024 Joshua Boudreau <jboudreau@45drives.com> 8.7.1.0.0-45d4
 - Fix dkms build for rocky
 * Thu Dec 07 2023 Joshua Boudreau <jboudreau@45drives.com> 8.7.1.0.0-45d3
