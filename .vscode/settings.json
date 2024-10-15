@@ -1,0 +1,18 @@
+{
+    "files.associations": {
+        "*.dox": "cpp",
+        "*.cpp": "cpp",
+        "*.c": "c",
+        "*.hpp": "cpp",
+        "*.h": "c",
+        "*.py3": "python",
+        "*.py": "python",
+        "*.yml": "yaml",
+        "Doxyfile": "plaintext",
+        "*.ipp": "c",
+        "chrono": "c",
+        "text_encoding": "c",
+        "typeindex": "c",
+        "typeinfo": "c"
+    }
+}

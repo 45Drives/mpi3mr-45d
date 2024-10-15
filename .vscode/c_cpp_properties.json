@@ -4,12 +4,13 @@
             "name": "Linux 5.4",
             "includePath": [
                 "${workspaceFolder}/**",
+                "/usr/src/linux54/include",
+                "/usr/src/linux54/include/generated",
+                "/usr/src/linux54/include/generated/uapi",
+                "/usr/src/linux54/arch/x86/include",
+                "/usr/src/linux54/arch/x86/include/generated",
                 "/usr/include",
-                "/usr/local/include",
-                "/usr/lib/modules/5.4.250-1-MANJARO/build/include",
-                "/usr/lib/modules/5.4.250-1-MANJARO/build/arch/x86/include",
-                "/usr/lib/modules/5.4.250-1-MANJARO/build/arch/x86/include/generated",
-                "/usr/lib/gcc/x86_64-pc-linux-gnu/13.1.1/include"
+                "/usr/local/include"
             ],
             "defines": [
                 "__GNUC__",
