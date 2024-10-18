@@ -21,7 +21,7 @@ sed -i 's/PACKAGE_VERSION=.*/PACKAGE_VERSION='"$DRIVER_VERSION"'/' dkms.conf
 read -rp "Auto run manup now? [y/N] " yn
 if [[ "$yn" == [Yy] ]]; then
   PKG_VERSION="$(echo "$DRIVER_VERSION" | tr -d '"' | cut -d '-' -f 1)"
-  BUILD_NUMBER="$(echo "$DRIVER_VERSION" | tr -d '"' | cut -d '-' -f 2)1"
+  BUILD_NUMBER="$(echo "$DRIVER_VERSION" | tr -d '"' | cut -d '-' -f 2)"
 
   CHANGE_NOTES=("Update upstream driver to $PKG_VERSION")
 
