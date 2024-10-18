@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.9.1.0.0-45d2focal) focal; urgency=medium
+
+  * Update compat for kernel >= 6.6
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 18 Oct 2024 09:54:19 -0300
+
 mpi3mr-dkms (8.9.1.0.0-45d1focal) focal; urgency=medium
 
   * Update upstream driver to 8.9.1.0.0
