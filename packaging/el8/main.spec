@@ -37,11 +37,11 @@ rm -rf %{buildroot}
 %attr(0755,root,root) /usr/src/%{PACKAGE_NAME}-%{PACKAGE_VERSION}/
 
 %post
-/usr/sbin/dkms add -m %{PACKAGE_NAME} -v %{PACKAGE_VERSION}
+/usr/sbin/dkms add -m %{PACKAGE_NAME} -v %{PACKAGE_VERSION} --rpm_safe_upgrade
 /usr/sbin/dkms build -m %{PACKAGE_NAME} -v %{PACKAGE_VERSION} && /usr/sbin/dkms install -m %{PACKAGE_NAME} -v %{PACKAGE_VERSION}
 
 %preun
-/usr/sbin/dkms remove -m %{PACKAGE_NAME} -v %{PACKAGE_VERSION} --all
+/usr/sbin/dkms remove -m %{PACKAGE_NAME} -v %{PACKAGE_VERSION} --all --rpm_safe_upgrade
 exit 0
 
 %changelog
