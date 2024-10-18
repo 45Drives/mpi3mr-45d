@@ -22,7 +22,18 @@ read -rp "Auto run manup now? [y/N] " yn
 if [[ "$yn" == [Yy] ]]; then
   PKG_VERSION="$(echo "$DRIVER_VERSION" | tr -d '"' | cut -d '-' -f 1)"
   BUILD_NUMBER="$(echo "$DRIVER_VERSION" | tr -d '"' | cut -d '-' -f 2)1"
-  manup -u -v "$PKG_VERSION" -b "$BUILD_NUMBER" "Update upstream driver to $PKG_VERSION"
+
+  CHANGE_NOTES=("Update upstream driver to $PKG_VERSION")
+
+  tmpfile=$(mktemp)
+  cat <<EOF > "$tmpfile"
+$(printf "%s\n" "${CHANGE_NOTES[@]}")
+# Changelog text, one bullet point per line
+EOF
+  ${VISUAL:-${EDITOR:-nano}} "$tmpfile"
+  mapfile -t CHANGE_NOTES < <(awk '/^[^#]/{print $0}' "$tmpfile")
+  rm -f "$tmpfile" > /dev/null
+  manup -u -v "$PKG_VERSION" -b "$BUILD_NUMBER" "${CHANGE_NOTES[@]}"
   manup -p
 fi
 
