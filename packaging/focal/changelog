@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.9.1.0.0-45d4focal) focal; urgency=medium
+
+  * Fix build in Rocky 9.4 again
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 18 Oct 2024 10:59:36 -0300
+
 mpi3mr-dkms (8.9.1.0.0-45d3focal) focal; urgency=medium
 
   * Fix build for rocky >= 9.4

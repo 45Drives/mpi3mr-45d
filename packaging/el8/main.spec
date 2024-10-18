@@ -45,6 +45,8 @@ rm -rf %{buildroot}
 exit 0
 
 %changelog
+* Fri Oct 18 2024 Joshua Boudreau <jboudreau@45drives.com> 8.9.1.0.0-45d4
+- Fix build in Rocky 9.4 again
 * Fri Oct 18 2024 Joshua Boudreau <jboudreau@45drives.com> 8.9.1.0.0-45d3
 - Fix build for rocky >= 9.4
 * Fri Oct 18 2024 Joshua Boudreau <jboudreau@45drives.com> 8.9.1.0.0-45d2
