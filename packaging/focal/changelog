@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.9.1.0.0-45d3focal) focal; urgency=medium
+
+  * Fix build for rocky >= 9.4
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 18 Oct 2024 10:21:50 -0300
+
 mpi3mr-dkms (8.9.1.0.0-45d2focal) focal; urgency=medium
 
   * Update compat for kernel >= 6.6
