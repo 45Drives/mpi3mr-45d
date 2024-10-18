@@ -17,8 +17,9 @@ DKMS package of the mpi3mr driver, patched to expose slot number for array devic
 4. Extract contents and copy files to repo in `upstream` branch and commit them
 5. `git checkout patched`
 6. `git merge upstream` and handle conflicts
+   1. make sure to update `MPI3MR_DRIVER_VERSION` in mpi3mr.h properly
 7. `git checkout main`
 8. `git merge upstream` (should *not* have any conflicts)
-9. `./gen-patch.sh`
+9.  `./gen-patch.sh`
 10. ~~Update `PACKAGE_VERSION` in dkms.conf~~ done by `./gen-patch.sh`
 11. ~~`manup` update the version/build~~ done by `./gen-patch.sh`
