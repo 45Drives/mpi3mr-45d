@@ -10,8 +10,8 @@ Requires: ::package_dependencies_el_el8::
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
-%global PACKAGE_NAME mpi3mr
-%global PACKAGE_VERSION ::package_version::-45d
+%global PACKAGE_NAME %(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2)
+%global PACKAGE_VERSION %(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2)
 
 %description
 ::package_title::
