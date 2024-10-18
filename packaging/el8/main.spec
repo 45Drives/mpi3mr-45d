@@ -11,7 +11,7 @@ Requires: ::package_dependencies_el_el8::
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %global PACKAGE_NAME mpi3mr
-%global PACKAGE_VERSION %{version}-%{release}
+%global PACKAGE_VERSION ::package_version::-::package_build_version::
 
 %description
 ::package_title::
