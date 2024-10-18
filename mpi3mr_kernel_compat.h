@@ -140,3 +140,14 @@ static inline void mpi3mr_scsi_build_sense(struct scsi_cmnd *scmd,
 #ifndef fallthrough
 #define fallthrough
 #endif
+
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)))
+static inline int pci_enable_pcie_error_reporting(struct pci_dev *dev)
+{
+	return -EINVAL;
+}
+static inline int pci_disable_pcie_error_reporting(struct pci_dev *dev)
+{
+	return -EINVAL;
+}
+#endif
