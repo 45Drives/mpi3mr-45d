@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.9.1.0.0-45d5focal) focal; urgency=medium
+
+  * Add kernel dev dependencies for build
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Mon, 28 Oct 2024 08:54:44 -0300
+
 mpi3mr-dkms (8.9.1.0.0-45d4focal) focal; urgency=medium
 
   * Fix build in Rocky 9.4 again

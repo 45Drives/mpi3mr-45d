@@ -4,7 +4,7 @@
     "title": "mpi3mr",
     "prerelease": false,
     "version": "8.9.1.0.0",
-    "buildVersion": "45d4",
+    "buildVersion": "45d5",
     "author": "Joshua Boudreau <jboudreau@45drives.com>",
     "url": "https://github.com/45Drives/mpi3mr-45d",
     "category": "utils",
@@ -25,13 +25,15 @@
         "deb": {
             "focal": [
                 "dkms",
-                "patch"
+                "patch",
+                "linux-headers-generic"
             ]
         },
         "el": {
             "el8": [
                 "dkms",
-                "patch"
+                "patch",
+                "kernel-devel"
             ]
         }
     },
@@ -50,7 +52,7 @@
     "changelog": {
         "urgency": "medium",
         "version": "8.9.1.0.0",
-        "buildVersion": "45d4",
+        "buildVersion": "45d5",
         "ignore": [],
         "date": null,
         "packager": "Joshua Boudreau <jboudreau@45drives.com>",
