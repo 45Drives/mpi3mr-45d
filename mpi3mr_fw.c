@@ -10,6 +10,48 @@
 #include "mpi3mr.h"
 #include "mpi3mr_app.h"
 
+#ifdef REIMPLEMENT_PCI_ENABLE_PCIE_ERROR_REPORTING
+#include <linux/aer.h>
+#define	PCI_EXP_AER_FLAGS	(PCI_EXP_DEVCTL_CERE | PCI_EXP_DEVCTL_NFERE | \
+				 PCI_EXP_DEVCTL_FERE | PCI_EXP_DEVCTL_URRE)
+
+MODULE_IMPORT_NS(CXL);
+
+#if (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 4))
+static inline int pcie_aer_is_native(struct pci_dev *dev)
+{
+	struct pci_host_bridge *host = pci_find_host_bridge(dev->bus);
+
+	if (!dev->aer_cap)
+		return 0;
+
+	return pcie_ports_native || host->native_aer;
+}
+#endif
+
+static inline int pci_enable_pcie_error_reporting(struct pci_dev *dev)
+{
+	int rc;
+
+	if (!pcie_aer_is_native(dev))
+		return -EIO;
+
+	rc = pcie_capability_set_word(dev, PCI_EXP_DEVCTL, PCI_EXP_AER_FLAGS);
+	return pcibios_err_to_errno(rc);
+}
+
+static inline int pci_disable_pcie_error_reporting(struct pci_dev *dev)
+{
+	int rc;
+
+	if (!pcie_aer_is_native(dev))
+		return -EIO;
+
+	rc = pcie_capability_clear_word(dev, PCI_EXP_DEVCTL, PCI_EXP_AER_FLAGS);
+	return pcibios_err_to_errno(rc);
+}
+#endif
+
 static int poll_queues;
 module_param(poll_queues, int, 0444);
 #if (KERNEL_VERSION(5, 13, 0) <= LINUX_VERSION_CODE)
@@ -7074,6 +7116,3 @@ int mpi3mr_cfg_get_driver_pg2(struct mpi3mr_ioc *mrioc,
 out_failed:
 	return -1;
 }
-
-
-

@@ -1,0 +1,58 @@
+{
+    "configurations": [
+        {
+            "name": "Linux 5.4",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/src/linux54/include",
+                "/usr/src/linux54/include/generated",
+                "/usr/src/linux54/include/generated/uapi",
+                "/usr/src/linux54/arch/x86/include",
+                "/usr/src/linux54/arch/x86/include/generated",
+                "/usr/include",
+                "/usr/local/include"
+            ],
+            "defines": [
+                "__GNUC__",
+                "__KERNEL__"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "intelliSenseMode": "linux-gcc-x64"
+        },
+        {
+            "name": "Linux66",
+            "includePath": [
+                "${workspaceFolder}",
+                "/usr/src/linux66/include",
+                "/usr/src/linux66/arch/x86/include",
+                "/usr/src/linux66/arch/x86/include/generated",
+                "/usr/src/linux66/arch/x86/include/generated/uapi",
+                "/usr/include",
+                "/usr/local/include"
+            ],
+            "defines": [
+                "KBUILD_MODNAME=\"45d_hud\"",
+                "__GNUC__",
+                "__KERNEL__",
+                "MODULE",
+                "CONFIG_PCI=y"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-clang-x64",
+            "browse": {
+                "path": [
+                    "/usr/src/linux66/include",
+                    "/usr/src/linux66/arch/x86/include",
+                    "/usr/src/linux66/arch/x86/include/generated",
+                    "/usr/src/linux66/arch/x86/include/generated/uapi",
+                    "/usr/include",
+                    "/usr/local/include"
+                ],
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            }
+        },
+    ],
+    "version": 4
+}

@@ -143,12 +143,5 @@ static inline void mpi3mr_scsi_build_sense(struct scsi_cmnd *scmd,
 
 #if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)) || \
     (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 4)))
-static inline int pci_enable_pcie_error_reporting(struct pci_dev *dev)
-{
-    return -EINVAL;
-}
-static inline int pci_disable_pcie_error_reporting(struct pci_dev *dev)
-{
-    return -EINVAL;
-}
+#define REIMPLEMENT_PCI_ENABLE_PCIE_ERROR_REPORTING
 #endif
