@@ -72,7 +72,7 @@ extern spinlock_t mrioc_list_lock;
 extern struct list_head mrioc_list;
 extern atomic64_t event_counter;
 
-#define MPI3MR_DRIVER_VERSION	"8.9.1.0.0-45d4"
+#define MPI3MR_DRIVER_VERSION	"8.9.1.0.0-45d6"
 #define MPI3MR_DRIVER_RELDATE	"11-April-2024"
 
 #define MPI3MR_DRIVER_NAME	"mpi3mr"
