@@ -4,7 +4,7 @@
     "title": "mpi3mr",
     "prerelease": false,
     "version": "8.9.1.0.0",
-    "buildVersion": "45d5",
+    "buildVersion": "45d6",
     "author": "Joshua Boudreau <jboudreau@45drives.com>",
     "url": "https://github.com/45Drives/mpi3mr-45d",
     "category": "utils",
@@ -52,7 +52,7 @@
     "changelog": {
         "urgency": "medium",
         "version": "8.9.1.0.0",
-        "buildVersion": "45d5",
+        "buildVersion": "45d6",
         "ignore": [],
         "date": null,
         "packager": "Joshua Boudreau <jboudreau@45drives.com>",

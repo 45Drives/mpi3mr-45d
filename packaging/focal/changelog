@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.9.1.0.0-45d6focal) focal; urgency=medium
+
+  * Fix build for RHEL
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 15 Nov 2024 11:22:00 -0400
+
 mpi3mr-dkms (8.9.1.0.0-45d5focal) focal; urgency=medium
 
   * Add kernel dev dependencies for build
