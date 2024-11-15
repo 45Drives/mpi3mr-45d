@@ -10,14 +10,22 @@ Requires: ::package_dependencies_el_el8::
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
-%define PACKAGE_NAME "%(grep PACKAGE_NAME= $BUILDROOT/dkms.conf | cut -d= -f2 | cut -d'"' -f2)"
-%define PACKAGE_VERSION "%(grep PACKAGE_VERSION= $BUILDROOT/dkms.conf | cut -d= -f2 | cut -d'"' -f2)"
+%global PACKAGE_NAME mpi3mr
+%global PACKAGE_VERSION ::package_version::-::package_build_version::
 
 %description
 ::package_title::
 ::package_description_long::
 
 %prep
+if [ "%{PACKAGE_NAME}" != "$(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2)" ]; then
+    echo "package name does not match package name in dkms.conf" >&2
+    exit 1
+fi
+if [ "%{PACKAGE_VERSION}" != "$(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | cut -d\" -f2)" ]; then
+    echo "package version does not match package version in dkms.conf" >&2
+    exit 1
+fi
 %setup -q
 
 %build
