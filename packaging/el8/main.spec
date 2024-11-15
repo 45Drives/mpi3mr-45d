@@ -18,6 +18,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 ::package_description_long::
 
 %prep
+%setup -q
 if [ "%{PACKAGE_NAME}" != "$(grep PACKAGE_NAME= dkms.conf | cut -d= -f2 | cut -d\" -f2)" ]; then
     echo "package name does not match package name in dkms.conf" >&2
     exit 1
@@ -26,7 +27,6 @@ if [ "%{PACKAGE_VERSION}" != "$(grep PACKAGE_VERSION= dkms.conf | cut -d= -f2 | 
     echo "package version does not match package version in dkms.conf" >&2
     exit 1
 fi
-%setup -q
 
 %build
 
