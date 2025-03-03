@@ -1,3 +1,3 @@
-## mpi3mr 8.9.1.0.0-45d6
+## mpi3mr 8.9.1.0.0-45d7
 
-* Fix build for RHEL
+* Ensure module overrides default on Debian

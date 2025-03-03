@@ -53,6 +53,8 @@ rm -rf %{buildroot}
 exit 0
 
 %changelog
+* Mon Mar 03 2025 Joshua Boudreau <jboudreau@45drives.com> 8.9.1.0.0-45d7
+- Ensure module overrides default on Debian
 * Fri Nov 15 2024 Joshua Boudreau <jboudreau@45drives.com> 8.9.1.0.0-45d6
 - Fix build for RHEL
 * Mon Oct 28 2024 Joshua Boudreau <jboudreau@45drives.com> 8.9.1.0.0-45d5

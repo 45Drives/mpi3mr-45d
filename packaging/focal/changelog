@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.9.1.0.0-45d7focal) focal; urgency=medium
+
+  * Ensure module overrides default on Debian
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Mon, 03 Mar 2025 13:09:07 -0400
+
 mpi3mr-dkms (8.9.1.0.0-45d6focal) focal; urgency=medium
 
   * Fix build for RHEL
