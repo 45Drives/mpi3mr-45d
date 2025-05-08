@@ -1,6 +1,6 @@
 Name: {{ name }}
 Version: {{ version }}
-Release: {{ build_number}}%{?dist}
+Release: {{ build_number }}%{?dist}
 Summary: {{ description }}
 License: {{ license }}
 URL: {{ git_url }}
@@ -11,7 +11,7 @@ Requires: {{ dependencies.rocky_common | join(',') }}
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %global PACKAGE_NAME mpi3mr
-%global PACKAGE_VERSION {{ version }}-{{ build_number}}
+%global PACKAGE_VERSION {{ version }}-{{ build_number }}
 
 %description
 {{ title }}
