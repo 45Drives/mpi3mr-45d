@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+FILES=(
+    moduleparams
+    mpi3mr_transport.c
+    mpi3mr_app.h
+    Kconfig
+    Makefile_upstream
+    mpi3mr.h
+    os_support.txt
+    mpi3mr_os.c
+    GPL_license.txt
+    mpi/mpi30_sas.h
+    mpi/mpi30_pci.h
+    mpi/mpi30_transport.h
+    mpi/mpi30_raid.h
+    mpi/mpi30_tool.h
+    mpi/mpi30_api.h
+    mpi/mpi30_cnfg.h
+    mpi/mpi30_type.h
+    mpi/mpi30_init.h
+    mpi/mpi30_ioc.h
+    mpi/mpi30_image.h
+    mpi/mpi30_targ.h
+    dkms.conf
+    mpi3mr_fw.c
+    mpi3mr_app.c
+    mpi3mr_debug.h
+    mpi3mr_debugfs.c
+    Makefile
+    mpi3mr_kernel_compat.h
+    patches/45drives.patch
+)
+
+for FILE in "${FILES[@]}"; do
+    DIR=$(dirname "$FILE")
+    echo "$FILE" "/usr/src/$PACKAGE_NAME-$PACKAGE_VERSION/$DIR"
+done
