@@ -4,7 +4,7 @@
     "title": "mpi3mr",
     "description": "Patched version of mpi3mr driver",
     "version": "8.9.1.0.0",
-    "buildVersion": "45d7",
+    "build_number": "45d7",
     "stable": true,
     "author": "Joshua Boudreau <jboudreau@45drives.com>",
     "git_url": "https://github.com/45Drives/mpi3mr-45d",
