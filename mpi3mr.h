@@ -2,7 +2,7 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2024 Broadcom Inc.
+ * Copyright (C) 2017-2025 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
@@ -35,6 +35,7 @@
 #include <linux/utsname.h>
 #include <asm/unaligned.h>
 #include <linux/kmsg_dump.h>
+#include <linux/vmalloc.h>
 
 #if !((defined(RHEL_MAJOR) && (RHEL_MAJOR == 8) && (RHEL_MINOR > 2)) || \
 	(defined(CONFIG_SUSE_KERNEL) && \
@@ -72,8 +73,8 @@ extern spinlock_t mrioc_list_lock;
 extern struct list_head mrioc_list;
 extern atomic64_t event_counter;
 
-#define MPI3MR_DRIVER_VERSION	"8.9.1.0.0-45d7"
-#define MPI3MR_DRIVER_RELDATE	"11-April-2024"
+#define MPI3MR_DRIVER_VERSION	"8.13.1.0.0-45d1"
+#define MPI3MR_DRIVER_RELDATE	"23-April-2025"
 
 #define MPI3MR_DRIVER_NAME	"mpi3mr"
 #define MPI3MR_DRIVER_LICENSE	"GPL"
@@ -98,13 +99,14 @@ extern atomic64_t event_counter;
 
 /* Admin queue management definitions */
 #define MPI3MR_ADMIN_REQ_Q_SIZE		(2 * MPI3MR_PAGE_SIZE_4K)
-#define MPI3MR_ADMIN_REPLY_Q_SIZE	(4 * MPI3MR_PAGE_SIZE_4K)
+#define MPI3MR_ADMIN_REPLY_Q_SIZE	(8 * MPI3MR_PAGE_SIZE_4K)
 #define MPI3MR_ADMIN_REQ_FRAME_SZ	128
 #define MPI3MR_ADMIN_REPLY_FRAME_SZ	16
 
 /* Operational queue management definitions */
 #define MPI3MR_OP_REQ_Q_QD		512
 #define MPI3MR_OP_REP_Q_QD		1024
+#define MPI3MR_OP_REP_Q_QD2K		2048
 #define MPI3MR_OP_REP_Q_QD4K		4096
 #define MPI3MR_OP_REQ_Q_SEG_SIZE	4096
 #define MPI3MR_OP_REP_Q_SEG_SIZE	4096
@@ -144,8 +146,10 @@ extern atomic64_t event_counter;
 #define MPI3MR_INTADMCMD_TIMEOUT		60
 #define MPI3MR_PORTENABLE_TIMEOUT		300
 #define MPI3MR_PORTENABLE_POLL_INTERVAL		5
+
 #define MPI3MR_ABORTTM_TIMEOUT			60
 #define MPI3MR_RESETTM_TIMEOUT			60
+
 #define MPI3MR_TSUPDATE_INTERVAL		900
 #define MPI3MR_DEFAULT_SHUTDOWN_TIME		120
 #define	MPI3MR_RAID_ERRREC_RESET_TIMEOUT	180
@@ -160,8 +164,6 @@ extern atomic64_t event_counter;
 #define MPI3MR_EH_SCMD_TIMEOUT			(60 * HZ)
 
 #define MPI3MR_WATCHDOG_INTERVAL		1000 /* in milli seconds */
-
-#define MPI3MR_DEFAULT_CFG_PAGE_SZ	1024 /*bytes*/
 
 /* Internal admin command state definitions*/
 #define MPI3MR_CMD_NOTUSED	0x8000
@@ -291,6 +293,7 @@ enum mpi3mr_reset_reason {
 	MPI3MR_RESET_FROM_CFG_REQ_TIMEOUT = 29,
 	MPI3MR_RESET_FROM_SAS_TRANSPORT_TIMEOUT = 30,
 	MPI3MR_RESET_FROM_TRIGGER = 31,
+	MPI3MR_RESET_FROM_INVALID_COMPLETION = 35,
 };
 
 #define MPI3MR_RESET_REASON_OSTYPE_LINUX	1
@@ -303,6 +306,8 @@ enum queue_type {
 	MPI3MR_DEFAULT_QUEUE = 0,
 	MPI3MR_POLL_QUEUE,
 };
+
+#define MPI3MR_THRESHOLD_REPLY_COUNT	100
 
 /**
  * struct mpi3mr_compimg_ver - replica of component image
@@ -356,6 +361,7 @@ struct mpi3mr_ioc_facts {
 	u8 who_init;
 	u8 personality;
 	u8 dma_mask;
+	bool max_req_limit;
 	u8 protocol_flags;
 	u8 sge_mod_mask;
 	u8 sge_mod_value;
@@ -396,7 +402,7 @@ struct mpi3mr_fwevt {
 	bool pending_at_sml;
 	bool discard;
 	struct kref ref_count;
-	char event_data[0] __aligned(4);
+	char event_data[] __aligned(4);
 };
 
 /**
@@ -471,6 +477,8 @@ struct op_req_qinfo {
  * @enable_irq_poll: Flag to indicate polling is enabled
  * @in_use: Queue is handled by poll/ISR
  * @qtype: Type of queue (types defined in enum queue_type)
+ * @qfull_watermark: Watermark defined in reply queue to avoid
+ *                 reply queue full
  */
 struct op_reply_qinfo {
 	u16 ci;
@@ -486,6 +494,7 @@ struct op_reply_qinfo {
 	bool enable_irq_poll;
 	atomic_t in_use;
 	enum queue_type qtype;
+	u16 qfull_watermark;
 };
 
 /**
@@ -561,7 +570,7 @@ struct mpi3mr_sas_port {
 	u8 num_phys;
 	u8 marked_responding;
 	int lowest_phy;
-	u32 phy_mask;
+	u64 phy_mask;
 	struct mpi3mr_hba_port *hba_port;
 	struct sas_identify remote_identify;
 	struct sas_rphy *rphy;
@@ -967,6 +976,8 @@ struct scmd_priv {
  * @size: Buffer size
  * @addr: Virtual address
  * @dma_addr: Buffer DMA address
+ * @is_segmented: The buffer is segmented or not
+ * @disabled_after_reset: The buffer is disabled after reset
  */
 struct diag_buffer_desc {
 	u8 type;
@@ -976,6 +987,8 @@ struct diag_buffer_desc {
 	u32 size;
 	void *addr;
 	dma_addr_t dma_addr;
+	bool is_segmented;
+	bool disabled_after_reset;
 };
 
 /**
@@ -1048,6 +1061,7 @@ struct mpi3mr_pdevinfo {
  * @admin_reply_base: Admin reply queue base virtual address
  * @admin_reply_dma: Admin reply queue base dma address
  * @admin_reply_q_in_use: Queue is handled by poll/ISR
+ * @admin_pend_isr: Count of unprocessed admin ISR/poll calls due to another thread processing replies
  * @ready_timeout: Controller ready timeout
  * @intr_info: Interrupt cookie pointer
  * @intr_info_count: Number of interrupt cookies
@@ -1122,6 +1136,7 @@ struct mpi3mr_pdevinfo {
  * @evtack_cmds_bitmap: Event Ack bitmap
  * @delayed_evtack_cmds_list: Delayed event acknowledgment list
  * @ts_update_counter: Timestamp update counter
+ * @ts_update_interval: Timestamp update interval
  * @reset_in_progress: Reset in progress flag
  * @unrecoverable: Controller unrecoverable flag
  * @block_bsgs: Block BSG flag
@@ -1150,6 +1165,7 @@ struct mpi3mr_pdevinfo {
  * @pel_seqnum_dma: PEL sequence number DMA address
  * @pel_seqnum_sz: PEL sequenece number size
  * @op_reply_q_offset: Operational reply queue offset with MSIx
+ * @sysfs_tm_mutex: Mutex to serialize TMs issued through SysFS
  * @sysfs_tm_pending: Pending TMs issued through SysFS
  * @sysfs_tm_issued: TMs issued through SysFS
  * @sysfs_tm_terminated_io_count:I/Os terminated by SysFS TMs
@@ -1177,9 +1193,6 @@ struct mpi3mr_pdevinfo {
  * @adm_req_q_bar_writeq_lock: Admin request queue lock
  * @adm_reply_q_bar_writeq_lock: Admin reply queue lock
  * @pend_ios: Pending IO Count
- * @cfg_page: Default memory for configuration pages
- * @cfg_page_dma: Configuration page DMA address
- * @cfg_page_sz: Default configuration page memory size
  * @sas_transport_enabled: SAS transport enabled or not
  * @scsi_device_channel: Channel ID for SCSI devices
  * @transport_cmds: Command tracker for SAS transport commands
@@ -1205,6 +1218,13 @@ struct mpi3mr_pdevinfo {
  * @pcie_err_recovery: PCIe error recovery in progress
  * @block_on_pcie_err: Block IO during PCI error recovery
  * @pdevinfo: PCI device information
+ * @reply_qfull_count: Occurences of reply queue full avoidance kicking-in
+ * @prevent_reply_qfull: Enable reply queue prevention
+ * @seg_tb_support: Segmented trace buffer support
+ * @num_tb_segs: Number of Segments in Trace buffer
+ * @trace_buf_pool: DMA pool for Segmented trace buffer segments
+ * @trace_buf: Trace buffer segments memory descriptor
+ * @invalid_io_comp: Invalid IO completion
  */
 struct mpi3mr_ioc {
 	struct list_head list;
@@ -1245,6 +1265,7 @@ struct mpi3mr_ioc {
 	void *admin_reply_base;
 	dma_addr_t admin_reply_dma;
 	atomic_t admin_reply_q_in_use;
+	atomic_t admin_pend_isr;
 
 	u32 ready_timeout;
 
@@ -1337,11 +1358,13 @@ struct mpi3mr_ioc {
 	void *evtack_cmds_bitmap;
 	struct list_head delayed_evtack_cmds_list;
 
-	u32 ts_update_counter;
+	u16 ts_update_counter;
+	u16 ts_update_interval;
 
 	u8 reset_in_progress;
 	u8 unrecoverable;
 	u8 block_bsgs;
+	u8 io_admin_reset_sync;
 	int prev_reset_result;
 	struct mutex reset_mutex;
 	wait_queue_head_t reset_waitq;
@@ -1374,6 +1397,7 @@ struct mpi3mr_ioc {
 	u32 pel_seqnum_sz;
 	u16 op_reply_q_offset;
 
+	struct mutex sysfs_tm_mutex;
 	atomic_t sysfs_tm_pending;
 	u16 sysfs_tm_issued;
 	u16 sysfs_tm_terminated_io_count;
@@ -1414,10 +1438,6 @@ struct mpi3mr_ioc {
 	atomic_t pend_ios;
 #endif
 
-	void *cfg_page;
-	dma_addr_t cfg_page_dma;
-	u16 cfg_page_sz;
-
 	u8 sas_transport_enabled;
 	u8 scsi_device_channel;
 	struct mpi3mr_drv_cmd transport_cmds;
@@ -1447,6 +1467,16 @@ struct mpi3mr_ioc {
 	bool pcie_err_recovery;
 	bool block_on_pcie_err;
 	struct mpi3mr_pdevinfo pdevinfo;
+
+	atomic_t reply_qfull_count;
+
+	bool prevent_reply_qfull;
+
+	bool seg_tb_support;
+	u32 num_tb_segs;
+	struct dma_pool *trace_buf_pool;
+	struct segments *trace_buf;
+	u8 invalid_io_comp;
 };
 
 int mpi3mr_setup_resources(struct mpi3mr_ioc *mrioc);
@@ -1489,6 +1519,7 @@ void mpi3mr_stop_watchdog(struct mpi3mr_ioc *mrioc);
 
 int mpi3mr_soft_reset_handler(struct mpi3mr_ioc *mrioc,
     u16 reset_reason, u8 snapdump);
+
 int mpi3mr_issue_tm(struct mpi3mr_ioc *mrioc, u8 tm_type,
 	u16 handle, uint lun, u16 htag, ulong timeout,
 	struct mpi3mr_drv_cmd *drv_cmd,

@@ -2,7 +2,7 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2024 Broadcom Inc.
+ * Copyright (C) 2017-2025 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
@@ -209,6 +209,102 @@ void mpi3mr_hdbstatuschg_evt_th(struct mpi3mr_ioc *mrioc,
 }
 
 /**
+ * mpi3mr_alloc_trace_buffer:	Allocate segmented trace buffer
+ * @mrioc: Adapter instance reference
+ * @trace_size: Trace buffer size
+ *
+ * Allocate either segmented memory pools or contiguous buffer
+ * based on the controller capability for for the host trace
+ * buffer.
+ *
+ * Return: 0 on success, non-zero on failure.
+ */
+static int mpi3mr_alloc_trace_buffer(struct mpi3mr_ioc *mrioc, u32 *trace_size)
+{
+	struct diag_buffer_desc *diag_buffer = &mrioc->diag_buffers[0];
+	int i, sz;
+	u64 *diag_buffer_list = NULL;
+	dma_addr_t diag_buffer_list_dma;
+	u32 seg_count;
+
+	if (mrioc->seg_tb_support) {
+		seg_count = (*trace_size) / MPI3MR_PAGE_SIZE_4K;
+		*trace_size = seg_count * MPI3MR_PAGE_SIZE_4K;
+
+		diag_buffer_list = dma_zalloc_coherent(&mrioc->pdev->dev,
+				sizeof(u64) * seg_count,
+				&diag_buffer_list_dma, GFP_KERNEL);
+		if (!diag_buffer_list)
+			return -1;
+
+		mrioc->num_tb_segs = seg_count;
+
+		sz = sizeof(struct segments) * seg_count;
+		mrioc->trace_buf = kzalloc(sz, GFP_KERNEL);
+		if (!mrioc->trace_buf)
+			goto trace_buf_failed;
+
+		mrioc->trace_buf_pool = dma_pool_create("trace_buf pool",
+		    &mrioc->pdev->dev, MPI3MR_PAGE_SIZE_4K, MPI3MR_PAGE_SIZE_4K,
+		    0);
+		if (!mrioc->trace_buf_pool) {
+			ioc_err(mrioc, "trace buf pool: dma_pool_create failed\n");
+			goto trace_buf_pool_failed;
+		}
+
+		for (i = 0; i < seg_count; i++) {
+			mrioc->trace_buf[i].segment =
+			    dma_pool_zalloc(mrioc->trace_buf_pool, GFP_KERNEL,
+			    &mrioc->trace_buf[i].segment_dma);
+			diag_buffer_list[i] =
+			    (u64) mrioc->trace_buf[i].segment_dma;
+			if (!diag_buffer_list[i])
+				goto tb_seg_alloc_failed;
+		}
+
+		diag_buffer->addr =  diag_buffer_list;
+		diag_buffer->dma_addr = diag_buffer_list_dma;
+		diag_buffer->is_segmented = true;
+
+		dprint_init(mrioc, "segmented trace diag buffer is allocated successfully seg_count:%d\n",
+		    seg_count);
+		return 0;
+	} else {
+		diag_buffer->addr = dma_zalloc_coherent(&mrioc->pdev->dev,
+		    *trace_size, &diag_buffer->dma_addr, GFP_KERNEL);
+		if (diag_buffer->addr) {
+			dprint_init(mrioc, "trace diag buffer is allocated successfully\n");
+			return 0;
+		}
+		return -1;
+	}
+
+tb_seg_alloc_failed:
+	if (mrioc->trace_buf_pool) {
+		for (i = 0; i < mrioc->num_tb_segs; i++) {
+			if (mrioc->trace_buf[i].segment) {
+				dma_pool_free(mrioc->trace_buf_pool,
+				    mrioc->trace_buf[i].segment,
+				    mrioc->trace_buf[i].segment_dma);
+				mrioc->trace_buf[i].segment = NULL;
+			}
+			mrioc->trace_buf[i].segment = NULL;
+		}
+		dma_pool_destroy(mrioc->trace_buf_pool);
+		mrioc->trace_buf_pool = NULL;
+	}
+trace_buf_pool_failed:
+	kfree(mrioc->trace_buf);
+	mrioc->trace_buf = NULL;
+trace_buf_failed:
+	if (diag_buffer_list)
+		dma_free_coherent(&mrioc->pdev->dev,
+		    sizeof(u64) * mrioc->num_tb_segs,
+		    diag_buffer_list, diag_buffer_list_dma);
+	return -1;
+}
+
+/**
  * mpi3mr_alloc_diag_bufs - Allocate memory for diag buffers
  * @mrioc: Adapter instance reference
  *
@@ -235,7 +331,7 @@ void mpi3mr_alloc_diag_bufs(struct mpi3mr_ioc *mrioc)
 	retval = mpi3mr_cfg_get_driver_pg1(mrioc, &driver_pg1, pg_sz);
 	if (retval) {
 		ioc_warn(mrioc,
-		    "%s: driver page 1 read failed, allocating trace and firmware diag buffers of default size\n", __func__);
+		    "driver page 1 read failed, allocating trace and firmware diag buffers of default size\n");
 		trace_size = fw_size = MPI3MR_DEFAULT_HDB_MAX_SZ;
 		trace_dec_size = fw_dec_size = MPI3MR_DEFAULT_HDB_DEC_SZ;
 		trace_min_size = fw_min_size = MPI3MR_DEFAULT_HDB_MIN_SZ;
@@ -249,13 +345,13 @@ void mpi3mr_alloc_diag_bufs(struct mpi3mr_ioc *mrioc)
 		fw_dec_size = driver_pg1.host_diag_fw_decrement_size * 1024;
 		fw_min_size = driver_pg1.host_diag_fw_min_size * 1024;
 		dprint_init(mrioc,
-		    "%s:trace diag buffer sizes read from driver page1: maximum size = %dKB, decrement size = %dKB, minimum size = %dKB\n",
-		    __func__, driver_pg1.host_diag_trace_max_size,
+		    "trace diag buffer sizes read from driver page1: maximum size = %dKB, decrement size = %dKB, minimum size = %dKB\n",
+		    driver_pg1.host_diag_trace_max_size,
 		    driver_pg1.host_diag_trace_decrement_size,
 		    driver_pg1.host_diag_trace_min_size);
 		dprint_init(mrioc,
-		    "%s:firmware diag buffer sizes read from driver page1: maximum size = %dKB, decrement size = %dKB, minimum size = %dKB\n",
-		    __func__, driver_pg1.host_diag_fw_max_size,
+		    "firmware diag buffer sizes read from driver page1: maximum size = %dKB, decrement size = %dKB, minimum size = %dKB\n",
+		    driver_pg1.host_diag_fw_max_size,
 		    driver_pg1.host_diag_fw_decrement_size,
 		    driver_pg1.host_diag_fw_min_size);
 		if ((trace_size == 0) && (fw_size == 0))
@@ -271,46 +367,43 @@ retry_trace:
 		trace_min_size)) {
 		if (!retry)
 			dprint_init(mrioc,
-			    "%s:trying to allocate trace diag buffer of size = %dKB\n",
-			    __func__, trace_size / 1024);
-		diag_buffer->addr = dma_zalloc_coherent(&mrioc->pdev->dev,
-		    trace_size, &diag_buffer->dma_addr, GFP_KERNEL);
-		if (diag_buffer->addr) {
-			dprint_init(mrioc, "%s:trace diag buffer allocated successfully\n",
-			    __func__);
-			diag_buffer->size = trace_size;
-		} else {
+			    "trying to allocate trace diag buffer of size = %dKB\n",
+			    trace_size / 1024);
+		if ((!mrioc->seg_tb_support &&
+		    (get_order(trace_size) > MPI3MR_MAX_PAGE_ORDER)) ||
+		    mpi3mr_alloc_trace_buffer(mrioc, &trace_size))
+		{
 			retry = true;
 			trace_size -= trace_dec_size;
-			dprint_init(mrioc, "%s:trace diag buffer allocation failed, retrying smaller size %dKB\n",
-			    __func__, trace_size / 1024);
+			dprint_init(mrioc, "trace diag buffer allocation failed, retrying smaller size %dKB\n",
+			    trace_size / 1024);
 			goto retry_trace;
-		}
+		} else
+			diag_buffer->size = trace_size;
 	}
 
 	retry = false;
+
 retry_fw:
-
 	diag_buffer = &mrioc->diag_buffers[1];
-
 	diag_buffer->type = MPI3_DIAG_BUFFER_TYPE_FW;
 	diag_buffer->status = MPI3MR_HDB_BUFSTATUS_NOT_ALLOCATED;
 	if ((mrioc->facts.diag_fw_sz < fw_size) && (fw_size >= fw_min_size)) {
-		diag_buffer->addr = dma_zalloc_coherent(&mrioc->pdev->dev,
-		    fw_size, &diag_buffer->dma_addr, GFP_KERNEL);
+		if (get_order(fw_size) <= MPI3MR_MAX_PAGE_ORDER)
+			diag_buffer->addr = dma_zalloc_coherent(&mrioc->pdev->dev,
+			    fw_size, &diag_buffer->dma_addr, GFP_KERNEL);
 		if (!retry)
 			dprint_init(mrioc,
-			    "%s:trying to allocate firmware diag buffer of size = %dKB\n",
-			    __func__, fw_size / 1024);
+			    "trying to allocate firmware diag buffer of size = %dKB\n",
+			    fw_size / 1024);
 		if (diag_buffer->addr) {
-			dprint_init(mrioc, "%s:firmware diag buffer allocated successfully\n",
-			    __func__);
+			dprint_init(mrioc, "firmware diag buffer allocated successfully\n");
 			diag_buffer->size = fw_size;
 		} else {
 			retry = true;
 			fw_size -= fw_dec_size;
-			dprint_init(mrioc, "%s:trace diag buffer allocation failed, retrying smaller size %dKB\n",
-			    __func__, fw_size / 1024);
+			dprint_init(mrioc, "firmware diag buffer allocation failed, retrying smaller size %dKB\n",
+			    fw_size / 1024);
 			goto retry_fw;
 		}
 	}
@@ -333,6 +426,12 @@ int mpi3mr_issue_diag_buf_post(struct mpi3mr_ioc *mrioc,
 	u8 prev_status;
 	int retval = 0;
 
+	if (diag_buffer->disabled_after_reset) {
+		dprint_bsg_err(mrioc, "%s: skiping diag buffer posting as it is disabled after reset\n",
+		    __func__);
+		return -1;
+	}
+
 	memset(&diag_buf_post_req, 0, sizeof(diag_buf_post_req));
 	mutex_lock(&mrioc->init_cmds.mutex);
 	if (mrioc->init_cmds.state & MPI3MR_CMD_PENDING) {
@@ -349,8 +448,11 @@ int mpi3mr_issue_diag_buf_post(struct mpi3mr_ioc *mrioc,
 	diag_buf_post_req.address = le64_to_cpu(diag_buffer->dma_addr);
 	diag_buf_post_req.length = le32_to_cpu(diag_buffer->size);
 
-	dprint_bsg_info(mrioc, "%s: posting diag buffer type %d\n", __func__,
-	    diag_buffer->type);
+	if (diag_buffer->is_segmented)
+		diag_buf_post_req.msg_flags |= MPI3_DIAG_BUFFER_POST_MSGFLAGS_SEGMENTED;
+
+	dprint_bsg_info(mrioc, "%s: posting diag buffer type %d segmented:%d\n", __func__,
+	    diag_buffer->type, diag_buffer->is_segmented);
 	prev_status = diag_buffer->status;
 	diag_buffer->status = MPI3MR_HDB_BUFSTATUS_POSTED_UNPAUSED;
 	init_completion(&mrioc->init_cmds.done);
@@ -1058,6 +1160,40 @@ mpi3mr_bsg_refresh_hdb_triggers(struct mpi3mr_ioc *mrioc,
 }
 
 /**
+ * mpi3mr_copy_segmented_trace_buffer:	copy segmented trace
+ *					 buffer
+ * @mrioc: Adapter instance reference
+ * @dest: Destination address pointer
+ * @start_offset: Starting offset of the trace buffer to copy
+ * @length: Length to copy
+ *
+ * This function copies from the segmented buffer to given
+ * single buffer pointer.
+ *
+ * Returns: None.
+ */
+static inline void mpi3mr_copy_segmented_trace_buffer(struct mpi3mr_ioc *mrioc,
+    unsigned char *dest, uint32_t start_offset, uint32_t length)
+{
+	u32 segment_id = start_offset / MPI3MR_PAGE_SIZE_4K;
+	u16 segment_so = start_offset % MPI3MR_PAGE_SIZE_4K;
+	u16 copy_length;
+
+	while (length) {
+		if (length < (MPI3MR_PAGE_SIZE_4K -segment_so))
+			copy_length = length;
+		else
+			copy_length = (MPI3MR_PAGE_SIZE_4K -segment_so);
+		memcpy(dest, mrioc->trace_buf[segment_id].segment, copy_length);
+		length -= copy_length;
+		dest += copy_length;
+		segment_id++;
+		segment_so = 0;
+	}
+}
+
+
+/**
  * mpi3mr_bsg_upload_hdb - Upload a specific HDB to user space
  * @mrioc: Adapter instance reference
  * @job: BSG Job pointer
@@ -1071,6 +1207,7 @@ static long mpi3mr_bsg_upload_hdb(struct mpi3mr_ioc *mrioc,
 	struct diag_buffer_desc *diag_buffer;
 	uint32_t data_out_size;
 	uint32_t data_in_size;
+	unsigned char *local_buffer;
 
 	data_out_size = job->request_payload.payload_len;
 	data_in_size = job->reply_payload.payload_len;
@@ -1112,10 +1249,22 @@ static long mpi3mr_bsg_upload_hdb(struct mpi3mr_ioc *mrioc,
 		    upload_hdb.buf_type);
 		return -EINVAL;
 	}
-	if (job->reply_payload.payload_len >= upload_hdb.length) {
+	if ((diag_buffer->type == MPI3MR_HDB_BUFTYPE_TRACE) &&
+	    (diag_buffer->is_segmented == true)) {
+		local_buffer = vmalloc(data_in_size);
+		if (!local_buffer)
+			return -ENOMEM;
+		mpi3mr_copy_segmented_trace_buffer(mrioc, local_buffer,
+		    upload_hdb.start_offset, data_in_size);
 		sg_copy_from_buffer(job->reply_payload.sg_list,
-				    job->reply_payload.sg_cnt,
-				    (diag_buffer->addr + upload_hdb.start_offset), upload_hdb.length);
+		    job->reply_payload.sg_cnt, local_buffer, data_in_size);
+		vfree(local_buffer);
+		return 0;
+	} else {
+		sg_copy_from_buffer(job->reply_payload.sg_list,
+		    job->reply_payload.sg_cnt,
+		    (diag_buffer->addr + upload_hdb.start_offset),
+		    data_in_size);
 		return 0;
 	}
 	return -EFAULT;
@@ -2368,7 +2517,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 	struct mpi3_status_reply_descriptor *status_desc;
 	struct mpi3_scsi_task_mgmt_request *tm_req;
 	u32 erbsz = MPI3MR_SENSE_BUF_SZ, tmplen;
-	u16 dev_handle;
+	u16 dev_handle, tm_timeout = MPI3MR_RESETTM_TIMEOUT;
 	struct mpi3mr_tgt_dev *tgtdev;
 	struct mpi3mr_stgt_priv_data *stgt_priv = NULL;
 	struct mpi3mr_bsg_in_reply_buf *bsg_reply_buf = NULL;
@@ -2384,9 +2533,19 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 	if (!mrioc)
 		return -ENODEV;
 
+	if (mutex_lock_interruptible(&mrioc->bsg_cmds.mutex))
+		return -ERESTARTSYS;
+
+	if (mrioc->bsg_cmds.state & MPI3MR_CMD_PENDING) {
+		dprint_bsg_err(mrioc, "%s: command is in use\n", __func__);
+		mutex_unlock(&mrioc->bsg_cmds.mutex);
+		return -EAGAIN;
+	}
+
 	if (!mrioc->ioctl_sges_allocated) {
 		dprint_bsg_err(mrioc, "%s: DMA memory was not allocated\n",
 		    __func__);
+		mutex_unlock(&mrioc->bsg_cmds.mutex);
 		return -ENOMEM;
 	}
 
@@ -2394,13 +2553,16 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 		karg->timeout = MPI3MR_APP_DEFAULT_TIMEOUT;
 
 	mpi_req = kzalloc(MPI3MR_ADMIN_REQ_FRAME_SZ, GFP_KERNEL);
-	if (!mpi_req)
+	if (!mpi_req) {
+		mutex_unlock(&mrioc->bsg_cmds.mutex);
 		return -ENOMEM;
+	}
 	mpi_header = (struct mpi3_request_header *)mpi_req;
 
 	bufcnt = karg->buf_entry_list.num_of_entries;
 	drv_bufs = kzalloc((sizeof(*drv_bufs) * bufcnt), GFP_KERNEL);
 	if (!drv_bufs) {
+		mutex_unlock(&mrioc->bsg_cmds.mutex);
 		rval = -ENOMEM;
 		goto out;
 	}
@@ -2408,6 +2570,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 	dout_buf = (uint8_t *)kzalloc(job->request_payload.payload_len,
 				      GFP_KERNEL);
 	if (!dout_buf) {
+		mutex_unlock(&mrioc->bsg_cmds.mutex);
 		rval = -ENOMEM;
 		goto out;
 	}
@@ -2415,6 +2578,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 	din_buf = (uint8_t *)kzalloc(job->reply_payload.payload_len,
 				     GFP_KERNEL);
 	if (!din_buf) {
+		mutex_unlock(&mrioc->bsg_cmds.mutex);
 		rval = -ENOMEM;
 		goto out;
 	}
@@ -2490,6 +2654,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 					(mpi_msg_size > MPI3MR_ADMIN_REQ_FRAME_SZ)) {
 				dprint_bsg_err(mrioc, "%s: invalid MPI message size\n",
 					__func__);
+				mutex_unlock(&mrioc->bsg_cmds.mutex);
 				rval = -EINVAL;
 				goto out;
 			}
@@ -2502,6 +2667,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 		if (invalid_be) {
 			dprint_bsg_err(mrioc, "%s: invalid buffer entries passed\n",
 				__func__);
+			mutex_unlock(&mrioc->bsg_cmds.mutex);
 			rval = -EINVAL;
 			goto out;
 		}
@@ -2512,6 +2678,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 				dprint_bsg_err(mrioc, "%s: data_out buffer length mismatch\n",
 					__func__);
 				rval = -EINVAL;
+				mutex_unlock(&mrioc->bsg_cmds.mutex);
 				goto out;
 			}
 		} else {
@@ -2519,6 +2686,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 			if (sgl_din_iter > (din_buf + job->reply_payload.payload_len)) {
 				dprint_bsg_err(mrioc, "%s: data_in buffer length mismatch\n",
 					__func__);
+				mutex_unlock(&mrioc->bsg_cmds.mutex);
 				rval = -EINVAL;
 				goto out;
 			}
@@ -2533,6 +2701,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 		    "%s:%d: invalid data transfer size passed for function 0x%x din_size = %d, dout_size = %d\n",
 		    __func__, __LINE__, mpi_header->function, din_size,
 		    dout_size);
+		mutex_unlock(&mrioc->bsg_cmds.mutex);
 		rval = -EINVAL;
 		goto out;
 	}
@@ -2541,6 +2710,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 		dprint_bsg_err(mrioc,
 		    "%s:%d: invalid data transfer size passed for function 0x%x din_size = %d\n",
 		    __func__, __LINE__, mpi_header->function, din_size);
+		mutex_unlock(&mrioc->bsg_cmds.mutex);
 		rval = -EINVAL;
 		goto out;
 	}
@@ -2548,6 +2718,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 		dprint_bsg_err(mrioc,
 		    "%s:%d: invalid data transfer size passed for function 0x%x dout_size = %d\n",
 		    __func__, __LINE__, mpi_header->function, dout_size);
+		mutex_unlock(&mrioc->bsg_cmds.mutex);
 		rval = -EINVAL;
 		goto out;
 	}
@@ -2559,6 +2730,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 			    "%s:%d: invalid message size passed:%d:%d:%d:%d\n",
 			    __func__, __LINE__, din_cnt, dout_cnt, din_size,
 			    dout_size);
+			mutex_unlock(&mrioc->bsg_cmds.mutex);
 			rval = -EINVAL;
 			goto out;
 		}
@@ -2608,6 +2780,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 			if (mpi3mr_map_data_buffer_dma(mrioc, drv_buf_iter,
 			    desc_count)) {
 				rval = -ENOMEM;
+				mutex_unlock(&mrioc->bsg_cmds.mutex);
 				dprint_bsg_err(mrioc,
 				    "%s:%d: mapping data buffers failed\n",
 				    __func__, __LINE__);
@@ -2621,20 +2794,11 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 		sense_buff_k = kzalloc(erbsz, GFP_KERNEL);
 		if (!sense_buff_k) {
 			rval = -ENOMEM;
+			mutex_unlock(&mrioc->bsg_cmds.mutex);
 			goto out;
 		}
 	}
 
-	if (mutex_lock_interruptible(&mrioc->bsg_cmds.mutex)) {
-		rval = -ERESTARTSYS;
-		goto out;
-	}
-	if (mrioc->bsg_cmds.state & MPI3MR_CMD_PENDING) {
-		rval = -EAGAIN;
-		dprint_bsg_err(mrioc, "%s: command is in use\n", __func__);
-		mutex_unlock(&mrioc->bsg_cmds.mutex);
-		goto out;
-	}
 	if (mrioc->unrecoverable) {
 		dprint_bsg_err(mrioc, "%s: unrecoverable controller\n",
 		    __func__);
@@ -2771,10 +2935,11 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 			dprint_bsg_err(mrioc, "%s: bsg request timedout after %d seconds, issuing target reset to (0x%04x)\n",
 			    __func__, karg->timeout,
 			    mpi_header->function_dependent);
+
 			mpi3mr_issue_tm(mrioc,
 			    MPI3_SCSITASKMGMT_TASKTYPE_TARGET_RESET,
 			    mpi_header->function_dependent, 0,
-			    MPI3MR_HOSTTAG_BLK_TMS, MPI3MR_RESETTM_TIMEOUT,
+			    MPI3MR_HOSTTAG_BLK_TMS, tm_timeout,
 			    &mrioc->host_tm_cmds, &resp_code, NULL);
 		}
 		if (!(mrioc->bsg_cmds.state & MPI3MR_CMD_COMPLETE) &&
@@ -2803,7 +2968,7 @@ static long mpi3mr_bsg_process_mpt_cmds(struct bsg_job *job)
 	if ((mpirep_offset != 0xFF) &&
 	    drv_bufs[mpirep_offset].bsg_buf_len) {
 		drv_buf_iter = &drv_bufs[mpirep_offset];
-		drv_buf_iter->kern_buf_len = (sizeof(*bsg_reply_buf) - 1 +
+		drv_buf_iter->kern_buf_len = (sizeof(*bsg_reply_buf) +
 					   mrioc->reply_sz);
 		bsg_reply_buf = kzalloc(drv_buf_iter->kern_buf_len, GFP_KERNEL);
 
@@ -2963,7 +3128,7 @@ void mpi3mr_bsg_exit(struct mpi3mr_ioc *mrioc)
 	if (!mrioc->bsg_queue)
 		return;
 
-	bsg_remove_queue(mrioc->bsg_queue);
+	BSG_REMOVE_QUEUE(mrioc->bsg_queue);
 	mrioc->bsg_queue = NULL;
 
 	device_del(bsg_dev);
@@ -2983,6 +3148,40 @@ static void mpi3mr_bsg_node_release(struct device *dev)
 	put_device(dev->parent);
 }
 
+static void mpi3mr_bsg_queue_creation(struct mpi3mr_ioc *mrioc,
+    struct device *bsg_dev)
+{
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0))
+	mrioc->bsg_queue = bsg_setup_queue(bsg_dev, dev_name(bsg_dev),
+	    mpi3mr_bsg_request, SETUP_QUEUE_ARG);
+	if (IS_ERR(mrioc->bsg_queue)) {
+		ioc_err(mrioc, "%s: bsg registration failed\n",
+			dev_name(bsg_dev));
+		device_del(bsg_dev);
+		put_device(bsg_dev);
+	} else {
+		blk_queue_max_segments(mrioc->bsg_queue, MPI3MR_MAX_APP_XFER_SEGMENTS);
+		blk_queue_max_hw_sectors(mrioc->bsg_queue, MPI3MR_MAX_APP_XFER_SECTORS);
+	}
+#else
+	struct queue_limits lim = {
+		.max_hw_sectors		= MPI3MR_MAX_APP_XFER_SECTORS,
+		.max_segments		= MPI3MR_MAX_APP_XFER_SEGMENTS,
+	};
+
+	mrioc->bsg_queue = bsg_setup_queue(bsg_dev, dev_name(bsg_dev), &lim,
+	    mpi3mr_bsg_request, NULL, 0);
+	if (IS_ERR(mrioc->bsg_queue)) {
+		ioc_err(mrioc, "%s: bsg registration failed\n",
+			dev_name(bsg_dev));
+		device_del(bsg_dev);
+		put_device(bsg_dev);
+	}
+#endif
+}
+
+
 /**
  * mpi3mr_bsg_init -  registration with bsg layer
  * @mrioc: Adapter instance reference
@@ -2996,7 +3195,6 @@ void mpi3mr_bsg_init(struct mpi3mr_ioc *mrioc)
 {
 	struct device *bsg_dev = &mrioc->bsg_dev;
 	struct device *parent = &mrioc->shost->shost_gendev;
-	struct request_queue *queue;
 
 	device_initialize(bsg_dev);
 
@@ -3012,20 +3210,8 @@ void mpi3mr_bsg_init(struct mpi3mr_ioc *mrioc)
 		return;
 	}
 
-	queue = bsg_setup_queue(bsg_dev, dev_name(bsg_dev),
-			mpi3mr_bsg_request, NULL, 0);
-	if (IS_ERR(queue)) {
-		ioc_err(mrioc, "%s: bsg registration failed\n",
-		    dev_name(bsg_dev));
-		device_del(bsg_dev);
-		put_device(bsg_dev);
-		return;
-	}
+	mpi3mr_bsg_queue_creation(mrioc, bsg_dev);
 
-	blk_queue_max_segments(queue, MPI3MR_MAX_APP_XFER_SEGMENTS);
-	blk_queue_max_hw_sectors(queue, MPI3MR_MAX_APP_XFER_SECTORS);
-
-	mrioc->bsg_queue = queue;
 }
 /*
  * SCSI Host attributes under sysfs
@@ -3110,6 +3296,17 @@ reply_queue_count_show(struct device *dev, struct device_attribute *attr,
 
 static DEVICE_ATTR_RO(reply_queue_count);
 
+static ssize_t
+reply_qfull_count_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct Scsi_Host *shost = class_to_shost(dev);
+	struct mpi3mr_ioc *mrioc = shost_priv(shost);
+
+	return snprintf(buf, PAGE_SIZE, "%u\n", atomic_read(&mrioc->reply_qfull_count));
+}
+
+static DEVICE_ATTR_RO(reply_qfull_count);
 /**
  * mpi3mr_app_logging_level_show - Show controller debug level
  * @dev: class device
@@ -3372,6 +3569,7 @@ static void mpi3mr_app_tm_sysfs(struct mpi3mr_ioc *mrioc, u8 tm_type)
 	struct mpi3mr_sdev_priv_data *sdev_priv_data;
 	struct scsi_device *sdev;
 	unsigned long flags, r;
+	u16 timeout = MPI3MR_SYSFS_TM_TIMEOUT;
 
 	if (mrioc->unrecoverable || mrioc->reset_in_progress ||
 	    mrioc->block_bsgs || mrioc->block_on_pcie_err)
@@ -3415,12 +3613,10 @@ static void mpi3mr_app_tm_sysfs(struct mpi3mr_ioc *mrioc, u8 tm_type)
 		}
 		break;
 	}
-	scsi_unblock_requests(mrioc->shost);
 
 	if (atomic_read(&mrioc->sysfs_tm_pending)) {
 		r = wait_event_timeout(mrioc->sysfs_pending_tm_wq,
-		    !atomic_read(&mrioc->sysfs_tm_pending),
-		    MPI3MR_SYSFS_TM_TIMEOUT*HZ);
+		    !atomic_read(&mrioc->sysfs_tm_pending), timeout*HZ);
 		if (!r) {
 			ioc_err(mrioc,
 			    "%s: %d TM requests timed out\n", __func__,
@@ -3429,6 +3625,7 @@ static void mpi3mr_app_tm_sysfs(struct mpi3mr_ioc *mrioc, u8 tm_type)
 			    MPI3MR_RESET_FROM_SYSFS_TIMEOUT, 1);
 		}
 	}
+	scsi_unblock_requests(mrioc->shost);
 
 	ioc_info(mrioc, "%s: task management requests issued(%d)\n", __func__,
 	    mrioc->sysfs_tm_issued);
@@ -3460,6 +3657,9 @@ mpi3mr_app_task_management_store(struct device *cdev,
 	if (sscanf(buf, "%d", &opcode) != 1)
 		return -EINVAL;
 	if (mrioc->unrecoverable || mrioc->block_on_pcie_err)
+		return -EINVAL;
+
+	if (!mutex_trylock(&mrioc->sysfs_tm_mutex))
 		return -EINVAL;
 
 	switch (opcode) {
@@ -3511,6 +3711,9 @@ mpi3mr_app_task_management_store(struct device *cdev,
 		break;
 	};
 
+
+	mutex_unlock(&mrioc->sysfs_tm_mutex);
+
 	return strlen(buf);
 }
 static DEVICE_ATTR(task_management, 0200, NULL,
@@ -3524,6 +3727,7 @@ static struct attribute *mpi3mr_host_attrs[] = {
 	&dev_attr_fw_queue_depth.attr,
 	&dev_attr_op_req_q_count.attr,
 	&dev_attr_reply_queue_count.attr,
+	&dev_attr_reply_qfull_count.attr,
 	&dev_attr_logging_level.attr,
 	&dev_attr_adp_state.attr,
 	&dev_attr_task_management.attr,
@@ -3546,6 +3750,7 @@ struct device_attribute *mpi3mr_host_attrs[] = {
 	&dev_attr_fw_queue_depth,
 	&dev_attr_op_req_q_count,
 	&dev_attr_reply_queue_count,
+	&dev_attr_reply_qfull_count,
 	&dev_attr_logging_level,
 	&dev_attr_adp_state,
 	&dev_attr_task_management,
