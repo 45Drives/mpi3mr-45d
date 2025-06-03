@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- *  Copyright 2016-2024 Broadcom Inc. All rights reserved.
+ *  Copyright 2016-2025 Broadcom Inc. All rights reserved.
  */
 #ifndef MPI30_IMAGE_H
 #define MPI30_IMAGE_H     1
@@ -64,7 +64,17 @@ struct mpi3_component_image_header {
 #define MPI3_IMAGE_HEADER_SIGNATURE1_PSW                      (0x20575350)
 #define MPI3_IMAGE_HEADER_SIGNATURE1_CSW                      (0x20575343)
 #define MPI3_IMAGE_HEADER_SIGNATURE2_VALUE                    (0x50584546)
+#define MPI3_IMAGE_HEADER_FLAGS_SIGNED_UEFI_MASK              (0x00000300)
+#define MPI3_IMAGE_HEADER_FLAGS_SIGNED_UEFI_SHIFT             (8)
+#define MPI3_IMAGE_HEADER_FLAGS_SIGNED_UEFI_UNSPECIFIED       (0x00000000)
+#define MPI3_IMAGE_HEADER_FLAGS_SIGNED_UEFI_NOT_SIGNED        (0x00000100)
+#define MPI3_IMAGE_HEADER_FLAGS_SIGNED_UEFI_MICROSOFT_SIGNED  (0x00000200)
+#define MPI3_IMAGE_HEADER_FLAGS_CERT_CHAIN_FORMAT_MASK        (0x000000c0)
+#define MPI3_IMAGE_HEADER_FLAGS_CERT_CHAIN_FORMAT_SHIFT       (6)
+#define MPI3_IMAGE_HEADER_FLAGS_CERT_CHAIN_FORMAT_DEVICE_CERT (0x00000000)
+#define MPI3_IMAGE_HEADER_FLAGS_CERT_CHAIN_FORMAT_ALIAS_CERT  (0x00000040)
 #define MPI3_IMAGE_HEADER_FLAGS_DEVICE_KEY_BASIS_MASK         (0x00000030)
+#define MPI3_IMAGE_HEADER_FLAGS_DEVICE_KEY_BASIS_SHIFT        (4)
 #define MPI3_IMAGE_HEADER_FLAGS_DEVICE_KEY_BASIS_CDI          (0x00000000)
 #define MPI3_IMAGE_HEADER_FLAGS_DEVICE_KEY_BASIS_DI           (0x00000010)
 #define MPI3_IMAGE_HEADER_FLAGS_SIGNED_NVDATA                 (0x00000008)
@@ -132,6 +142,7 @@ struct mpi3_ci_manifest_mpi {
 	struct mpi3_ci_manifest_mpi_comp_image_ref   component_image_ref[MPI3_CI_MANIFEST_MPI_MAX];
 };
 #define MPI3_CI_MANIFEST_MPI_RELEASE_LEVEL_DEV                        (0x00)
+#define MPI3_CI_MANIFEST_MPI_RELEASE_LEVEL_PRE_PRODUCTION             (0x08)
 #define MPI3_CI_MANIFEST_MPI_RELEASE_LEVEL_PREALPHA                   (0x10)
 #define MPI3_CI_MANIFEST_MPI_RELEASE_LEVEL_ALPHA                      (0x20)
 #define MPI3_CI_MANIFEST_MPI_RELEASE_LEVEL_BETA                       (0x30)
@@ -198,18 +209,22 @@ struct mpi3_encrypted_hash_entry {
 	u8                         hash_image_type;
 	u8                         hash_algorithm;
 	u8                         encryption_algorithm;
-	u8                         reserved03;
+	u8                         flags;
 	__le16                     public_key_size;
 	__le16                     signature_size;
 	__le32                     public_key[MPI3_PUBLIC_KEY_MAX];
 };
-#define MPI3_HASH_IMAGE_TYPE_KEY_WITH_SIGNATURE      (0x03)
+#define MPI3_HASH_IMAGE_TYPE_KEY_WITH_HASH           (0x03)
+#define MPI3_HASH_IMAGE_TYPE_KEY_WITH_HASH_1_OF_2    (0x04)
+#define MPI3_HASH_IMAGE_TYPE_KEY_WITH_HASH_2_OF_2    (0x05)
 #define MPI3_HASH_ALGORITHM_VERSION_MASK             (0xe0)
+#define MPI3_HASH_ALGORITHM_VERSION_SHIFT            (5)
 #define MPI3_HASH_ALGORITHM_VERSION_NONE             (0x00)
 #define MPI3_HASH_ALGORITHM_VERSION_SHA1             (0x20)
 #define MPI3_HASH_ALGORITHM_VERSION_SHA2             (0x40)
 #define MPI3_HASH_ALGORITHM_VERSION_SHA3             (0x60)
 #define MPI3_HASH_ALGORITHM_SIZE_MASK                (0x1f)
+#define MPI3_HASH_ALGORITHM_SIZE_SHIFT               (0)
 #define MPI3_HASH_ALGORITHM_SIZE_UNUSED              (0x00)
 #define MPI3_HASH_ALGORITHM_SIZE_SHA256              (0x01)
 #define MPI3_HASH_ALGORITHM_SIZE_SHA512              (0x02)
@@ -224,6 +239,13 @@ struct mpi3_encrypted_hash_entry {
 #define MPI3_ENCRYPTION_ALGORITHM_ECDSA_P256         (0x07)
 #define MPI3_ENCRYPTION_ALGORITHM_ECDSA_P384         (0x08)
 #define MPI3_ENCRYPTION_ALGORITHM_ECDSA_P521         (0x09)
+#define MPI3_ENCRYPTION_ALGORITHM_LMS_HSS            (0x0a)
+															  /* hierarchical signature system (hss) */
+#define MPI3_ENCRYPTION_ALGORITHM_ML_DSA_87          (0x0b)
+#define MPI3_ENCRYPTION_ALGORITHM_ML_DSA_65          (0x0c)
+#define MPI3_ENCRYPTION_ALGORITHM_ML_DSA_44          (0x0d)
+#define MPI3_ENCRYPTED_HASH_ENTRY_FLAGS_PAIRED_KEY_MASK   (0x0f)
+#define MPI3_ENCRYPTED_HASH_ENTRY_FLAGS_PAIRED_KEY_SHIFT  (0)
 #ifndef MPI3_ENCRYPTED_HASH_ENTRY_MAX
 #define MPI3_ENCRYPTED_HASH_ENTRY_MAX               (1)
 #endif

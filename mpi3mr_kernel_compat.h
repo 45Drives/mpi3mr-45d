@@ -2,11 +2,13 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2024 Broadcom Inc.
+ * Copyright (C) 2017-2025 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
 #include <linux/kmsg_dump.h>
+#include <linux/mmzone.h>
+#include "mpi3mr_app.h"
 
 struct mpi3mr_kmsg_dumper {
 #if ((KERNEL_VERSION(5,13,0) <= LINUX_VERSION_CODE) || \
@@ -140,3 +142,23 @@ static inline void mpi3mr_scsi_build_sense(struct scsi_cmnd *scmd,
 #ifndef fallthrough
 #define fallthrough
 #endif
+
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)) || \
+      defined(RHEL_MAJOR))
+    #define SETUP_QUEUE_ARG NULL, 0
+    #define BSG_REMOVE_QUEUE(queue) bsg_remove_queue(queue)
+#else
+    #define SETUP_QUEUE_ARG 0
+    #define BSG_REMOVE_QUEUE(queue) \
+        do { \
+            bsg_unregister_queue(queue); \
+            blk_cleanup_queue(queue); \
+        } while(0)
+#endif
+
+#ifdef MAX_PAGE_ORDER
+#define MPI3MR_MAX_PAGE_ORDER MAX_PAGE_ORDER
+#else
+#define MPI3MR_MAX_PAGE_ORDER 10
+#endif
+

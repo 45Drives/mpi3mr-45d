@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- *  Copyright 2016-2024 Broadcom Inc. All rights reserved.
+ *  Copyright 2016-2025 Broadcom Inc. All rights reserved.
  */
 #ifndef MPI30_TOOL_H
 #define MPI30_TOOL_H     1
@@ -46,9 +46,11 @@ struct mpi3_tool_istwi_read_write_request {
 };
 #define MPI3_TOOLBOX_ISTWI_FLAGS_AUTO_RESERVE_RELEASE       (0x80)
 #define MPI3_TOOLBOX_ISTWI_FLAGS_ADDRESS_MODE_MASK          (0x04)
+#define MPI3_TOOLBOX_ISTWI_FLAGS_ADDRESS_MODE_SHIFT         (2)
 #define MPI3_TOOLBOX_ISTWI_FLAGS_ADDRESS_MODE_DEVINDEX      (0x00)
 #define MPI3_TOOLBOX_ISTWI_FLAGS_ADDRESS_MODE_DEVICE_FIELD  (0x04)
 #define MPI3_TOOLBOX_ISTWI_FLAGS_PAGE_ADDRESS_MASK          (0x03)
+#define MPI3_TOOLBOX_ISTWI_FLAGS_PAGE_ADDRESS_SHIFT         (0)
 #define MPI3_TOOLBOX_ISTWI_ACTION_RESERVE_BUS               (0x00)
 #define MPI3_TOOLBOX_ISTWI_ACTION_RELEASE_BUS               (0x01)
 #define MPI3_TOOLBOX_ISTWI_ACTION_RESET                     (0x02)
@@ -235,6 +237,7 @@ struct mpi3_driver_buffer_header {
 };
 #define MPI3_DRIVER_DIAG_BUFFER_HEADER_SIGNATURE_CIRCULAR                (0x43495243)
 #define MPI3_DRIVER_DIAG_BUFFER_HEADER_FLAGS_CIRCULAR_BUF_FORMAT_MASK    (0x00000003)
+#define MPI3_DRIVER_DIAG_BUFFER_HEADER_FLAGS_CIRCULAR_BUF_FORMAT_SHIFT   (0)
 #define MPI3_DRIVER_DIAG_BUFFER_HEADER_FLAGS_CIRCULAR_BUF_FORMAT_ASCII   (0x00000000)
 #define MPI3_DRIVER_DIAG_BUFFER_HEADER_FLAGS_CIRCULAR_BUF_FORMAT_RTTRACE (0x00000001)
 struct mpi3_diag_buffer_manage_request {
@@ -271,6 +274,7 @@ struct mpi3_diag_buffer_upload_request {
 	union mpi3_sge_union          sgl;
 };
 #define MPI3_DIAG_BUFFER_UPLOAD_FLAGS_FORMAT_MASK           (0x01)
+#define MPI3_DIAG_BUFFER_UPLOAD_FLAGS_FORMAT_SHIFT          (0)
 #define MPI3_DIAG_BUFFER_UPLOAD_FLAGS_FORMAT_DECODED        (0x00)
 #define MPI3_DIAG_BUFFER_UPLOAD_FLAGS_FORMAT_ENCODED        (0x01)
 struct mpi3_diag_buffer_upload_reply {
