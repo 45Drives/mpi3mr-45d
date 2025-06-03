@@ -1,3 +1,3 @@
-## mpi3mr 8.9.1.0.0-45d7
+## mpi3mr 8.13.1.0.0-45d1
 
-* Ensure module overrides default on Debian
+* Update upstream driver to 8.13.1.0.0

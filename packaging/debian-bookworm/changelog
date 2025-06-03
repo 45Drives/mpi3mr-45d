@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.13.1.0.0-45d1bookworm) bookworm; urgency=medium
+
+  * Update upstream driver to 8.13.1.0.0
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 03 Jun 2025 11:23:28 -0300
+
 mpi3mr-dkms (8.9.1.0.0-45d7bookworm) bookworm; urgency=medium
 
   * Ensure module overrides default on Debian
