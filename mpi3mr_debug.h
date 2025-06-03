@@ -2,7 +2,7 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2024 Broadcom Inc.
+ * Copyright (C) 2017-2025 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
@@ -32,6 +32,7 @@
 #define MPI3_DEBUG_TRANSPORT_INFO	0x00080000
 #define MPI3_DEBUG			0x01000000
 #define MPI3_DEBUG_SG			0x02000000
+#define MPI3_DEBUG_ADMIN_REQ		0x04000000
 
 
 /*

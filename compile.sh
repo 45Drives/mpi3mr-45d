@@ -28,7 +28,7 @@ SPARSE=0
 
 ./clean.sh
 
-if [ ${SPARSE} == 0 ] ; then
+if [ ${SPARSE} -eq 0 ] ; then
 	make -j4 CONFIG_DEBUG_INFO=1 -C /lib/modules/${kernel}/build \
 		M=$PWD 2>&1 | tee output.log
 else

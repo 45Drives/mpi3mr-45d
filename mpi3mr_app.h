@@ -2,7 +2,7 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2024 Broadcom Inc.
+ * Copyright (C) 2017-2025 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
@@ -87,6 +87,10 @@
 
 #define MPI3MR_HDB_QUERY_ELEMENT_TRIGGER_FORMAT_INDEX	0
 #define MPI3MR_HDB_QUERY_ELEMENT_TRIGGER_FORMAT_DATA	1
+
+void bsg_remove_queue(struct request_queue *);
+void bsg_unregister_queue(struct request_queue *);
+void blk_cleanup_queue(struct request_queue *);
 
 /* Supported BSG commands */
 enum command {
@@ -375,7 +379,7 @@ struct mpi3mr_bsg_in_reply_buf {
 	uint8_t mpi_reply_type;
 	uint8_t rsvd1;
 	uint16_t rsvd2;
-	uint8_t reply_buf[1]; /*Variable Length buffer based on mpi reply type*/
+	uint8_t reply_buf[]; /*Variable Length buffer based on mpi reply type*/
 };
 /**
  * struct mpi3mr_buf_entry - User buffer descriptor for MPI

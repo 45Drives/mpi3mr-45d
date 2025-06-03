@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- *  Copyright 2016-2024 Broadcom Inc. All rights reserved.
+ *  Copyright 2016-2025 Broadcom Inc. All rights reserved.
  */
 #ifndef MPI30_PCI_H
 #define MPI30_PCI_H     1
@@ -20,7 +20,7 @@ struct mpi3_nvme_encapsulated_request {
 	__le16                     flags;
 	__le32                     data_length;
 	__le32                     reserved14[3];
-	__le32                     command[MPI3_NVME_ENCAP_CMD_MAX];
+	__le32                     command[];
 };
 #define MPI3_NVME_FLAGS_FORCE_ADMIN_ERR_REPLY_MASK      (0x0002)
 #define MPI3_NVME_FLAGS_FORCE_ADMIN_ERR_REPLY_FAIL_ONLY (0x0000)
