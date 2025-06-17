@@ -1,3 +1,10 @@
+mpi3mr-dkms (8.13.1.0.0-45d2focal) focal; urgency=medium
+
+  * Update upstream driver to 8.13.1.0.0
+  * Fix build in EL 9.6, build against 5.14.0-570 broke due to upstream kernel backport
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 17 Jun 2025 11:31:34 -0300
+
 mpi3mr-dkms (8.13.1.0.0-45d1focal) focal; urgency=medium
 
   * Update upstream driver to 8.13.1.0.0

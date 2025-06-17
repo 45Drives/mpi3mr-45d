@@ -55,6 +55,9 @@ rm -rf %{buildroot}
 exit 0
 
 %changelog
+* Tue Jun 17 2025 Joshua Boudreau <jboudreau@45drives.com> 8.13.1.0.0-45d2
+- Update upstream driver to 8.13.1.0.0
+- Fix build in EL 9.6, build against 5.14.0-570 broke due to upstream kernel backport
 * Tue Jun 03 2025 Joshua Boudreau <jboudreau@45drives.com> 8.13.1.0.0-45d1
 - Update upstream driver to 8.13.1.0.0
 * Mon Mar 03 2025 Joshua Boudreau <jboudreau@45drives.com> 8.9.1.0.0-45d7
