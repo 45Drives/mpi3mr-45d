@@ -3152,7 +3152,8 @@ static void mpi3mr_bsg_queue_creation(struct mpi3mr_ioc *mrioc,
     struct device *bsg_dev)
 {
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)) && \
+	!defined(RHEL_MAJOR) || (RHEL_MAJOR < 9) ||  (RHEL_MAJOR == 9 && RHEL_MINOR < 6)
 	mrioc->bsg_queue = bsg_setup_queue(bsg_dev, dev_name(bsg_dev),
 	    mpi3mr_bsg_request, SETUP_QUEUE_ARG);
 	if (IS_ERR(mrioc->bsg_queue)) {
