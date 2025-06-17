@@ -13,9 +13,9 @@
         "change_urgency": "medium"
     },
     "architecture": {
-        "rocky": "x86_64",
-        "debian": "amd64",
-        "ubuntu": "amd64"
+        "rocky": "noarch",
+        "debian": "all",
+        "ubuntu": "all"
     },
     "dependencies": {
         "ubuntu_common": [
