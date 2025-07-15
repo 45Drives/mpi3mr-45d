@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.13.1.0.0-45d3jammy) jammy; urgency=medium
+
+  * Add pve-headers dependency for builds on PVE
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 15 Jul 2025 14:56:43 -0300
+
 mpi3mr-dkms (8.13.1.0.0-45d2jammy) jammy; urgency=medium
 
   * Update upstream driver to 8.13.1.0.0
