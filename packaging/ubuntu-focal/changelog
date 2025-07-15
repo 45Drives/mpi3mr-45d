@@ -1,9 +1,3 @@
-mpi3mr-dkms (8.13.1.0.0-45d2.1focal) focal; urgency=medium
-
-  * Add pve-headers dependency
-
- -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 15 Jul 2025 14:43:38 -0300
-
 mpi3mr-dkms (8.13.1.0.0-45d2focal) focal; urgency=medium
 
   * Update upstream driver to 8.13.1.0.0
