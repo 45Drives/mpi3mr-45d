@@ -1,3 +1,3 @@
-## mpi3mr 8.13.1.0.0-45d5
+## mpi3mr 8.13.1.0.0-45d6
 
-* Bump package version to fix pve-headers dependency
+* Add proxmox-default-headers dependency for newer PVE

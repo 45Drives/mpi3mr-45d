@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.13.1.0.0-45d6bookworm) bookworm; urgency=medium
+
+  * Add proxmox-default-headers dependency for newer PVE
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Wed, 16 Jul 2025 13:11:26 -0300
+
 mpi3mr-dkms (8.13.1.0.0-45d5bookworm) bookworm; urgency=medium
 
   * Bump package version to fix pve-headers dependency
