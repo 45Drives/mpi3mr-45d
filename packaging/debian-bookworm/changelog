@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.13.1.0.0-45d4bookworm) bookworm; urgency=medium
+
+  * Put pve-headers dep first
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 15 Jul 2025 15:14:34 -0300
+
 mpi3mr-dkms (8.13.1.0.0-45d3bookworm) bookworm; urgency=medium
 
   * Add pve-headers dependency for builds on PVE
