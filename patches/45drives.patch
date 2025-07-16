@@ -1,5 +1,5 @@
 diff --git a/mpi3mr.h b/mpi3mr.h
-index c8d38a8..6910d98 100755
+index c8d38a8..c7de38a 100755
 --- a/mpi3mr.h
 +++ b/mpi3mr.h
 @@ -52,6 +52,11 @@
@@ -20,7 +20,7 @@ index c8d38a8..6910d98 100755
  
 -#define MPI3MR_DRIVER_VERSION	"8.13.1.0.0"
 -#define MPI3MR_DRIVER_RELDATE	"23-April-2025"
-+#define MPI3MR_DRIVER_VERSION	"8.13.1.0.0-45d4"
++#define MPI3MR_DRIVER_VERSION	"8.13.1.0.0-45d5"
 +#define MPI3MR_DRIVER_RELDATE	"15-July-2025"
  
  #define MPI3MR_DRIVER_NAME	"mpi3mr"

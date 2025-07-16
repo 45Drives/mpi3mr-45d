@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.13.1.0.0-45d5jammy) jammy; urgency=medium
+
+  * Bump package version to fix pve-headers dependency
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Wed, 16 Jul 2025 12:49:28 -0300
+
 mpi3mr-dkms (8.13.1.0.0-45d4jammy) jammy; urgency=medium
 
   * Put pve-headers dep first

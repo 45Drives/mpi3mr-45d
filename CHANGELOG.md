@@ -1,3 +1,3 @@
-## mpi3mr 8.13.1.0.0-45d4
+## mpi3mr 8.13.1.0.0-45d5
 
-* Put pve-headers dep first
+* Bump package version to fix pve-headers dependency
