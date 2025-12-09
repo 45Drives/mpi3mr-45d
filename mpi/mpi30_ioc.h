@@ -381,6 +381,7 @@ struct mpi3_event_data_prepare_for_reset {
 struct mpi3_event_data_comp_image_activation {
 	__le32            reserved00;
 };
+
 struct mpi3_event_data_device_status_change {
 	__le16             task_tag;
 	u8                 reason_code;
@@ -617,6 +618,7 @@ struct mpi3_event_data_pcie_error_threshold {
 };
 #define MPI3_EVENT_PCI_ERROR_RC_THRESHOLD_EXCEEDED          (0x00)
 #define MPI3_EVENT_PCI_ERROR_RC_ESCALATION                  (0x01)
+
 struct mpi3_event_data_sas_init_dev_status_change {
 	u8                 reason_code;
 	u8                 io_unit_port;
