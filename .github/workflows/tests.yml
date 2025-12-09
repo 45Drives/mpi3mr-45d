@@ -18,10 +18,11 @@ jobs:
         run: ./test_builds.sh
 
       - name: Upload logs
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-build-logs
           path: |
             test_builds_out/**/*.log
+            test_builds_out.log
           retention-days: 7

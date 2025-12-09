@@ -2,14 +2,14 @@
 
 set -euo pipefail
 
-exec > >(sed -e 's/\bPASSED\b/\x1b[1;32m&\x1b[0m/g' -e 's/\bFAILED\b/\x1b[1;31m&\x1b[0m/g')
-
 SCRIPT_DIR="$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")"
 if [ -z "$SCRIPT_DIR" ]; then
     echo "Failed to get SCRIPT_DIR" >&2
     exit 1
 fi
 cd "$SCRIPT_DIR"
+
+exec > >(tee "$SCRIPT_DIR/test_builds_out.log" | sed -e 's/\bPASSED\b/\x1b[1;32m&\x1b[0m/g' -e 's/\bFAILED\b/\x1b[1;31m&\x1b[0m/g')
 
 if command -v podman >/dev/null 2>&1; then
     CONTAINER_ENGINE=podman
