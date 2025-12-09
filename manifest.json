@@ -21,7 +21,7 @@
         "ubuntu_common": [
             "dkms",
             "patch",
-            "proxmox-default-headers | pve-headers | linux-headers-generic"
+            "proxmox-default-headers | pve-headers | linux-headers-generic | linux-headers-amd64 [amd64] | linux-headers-arm64 [arm64]"
         ],
         "rocky_common": [
             "dkms",
