@@ -50,6 +50,14 @@ MODULE_PARM_DESC(max_sgl_entries,
 extern bool enable_segqueue;
 extern struct dentry *mpi3mr_debugfs_root;
 
+#ifdef VALIDATION_SUPPORT_CODE
+
+bool tm_failure_reset = false;
+module_param(tm_failure_reset, bool, 0444);
+MODULE_PARM_DESC(tm_failure_reset,
+	"Enablement of issuing controller reset if TM does not recover stuck IOs (default=false)");
+#endif
+
 /* Forward declarations*/
 static int mpi3mr_change_queue_depth(struct scsi_device *sdev,
 	int q_depth);
@@ -1310,10 +1318,12 @@ mpi3mr_debug_dump_devpg0(struct mpi3mr_ioc *mrioc, struct mpi3_device_page0 *dev
 		    &dev_pg0->device_specific.vd_format;
 
 		ioc_info(mrioc,
-		    "device_pg0: vd: state(0x%02x), raid_level(%d), flags(0x%04x), device_info(0x%04x)\n",
+		    "device_pg0: vd: state(0x%02x), raid_level(%d), flags(0x%04x), device_info(0x%04x) "
+		    "abort_timeout(%d), reset_timeout(%d)\n",
 		    vdinf->vd_state, vdinf->raid_level,
 		    le16_to_cpu(vdinf->flags),
-		    le16_to_cpu(vdinf->device_info));
+		    le16_to_cpu(vdinf->device_info),
+		    vdinf->vd_abort_to, vdinf->vd_reset_to);
 		ioc_info(mrioc,
 		    "device_pg0: vd: tg_id(%d), high(%dMiB), low(%dMiB), qd_reduction_factor(%d)\n",
 		    vdinf->io_throttle_group,
@@ -1486,6 +1496,12 @@ static void mpi3mr_update_tgtdev(struct mpi3mr_ioc *mrioc,
 		if (vdinf->vd_state == MPI3_DEVICE0_VD_STATE_OFFLINE)
 			tgtdev->is_hidden = 1;
 		tgtdev->non_stl = 1;
+		tgtdev->dev_spec.vd_inf.reset_to =
+			max_t(u8, vdinf->vd_reset_to,
+			      MPI3MR_INTADMCMD_TIMEOUT);
+		tgtdev->dev_spec.vd_inf.abort_to =
+			max_t(u8, vdinf->vd_abort_to,
+			      MPI3MR_INTADMCMD_TIMEOUT);
 		tgtdev->dev_spec.vd_inf.tg_id = vdinf->io_throttle_group;
 		tgtdev->dev_spec.vd_inf.tg_high =
 			le16_to_cpu(vdinf->io_throttle_group_high) * 2048;
@@ -2086,23 +2102,6 @@ static void mpi3mr_pcietopochg_evt_bh(struct mpi3mr_ioc *mrioc,
 }
 
 /**
- * mpi3mr_logdata_evt_bh -  Log data event bottomhalf
- * @mrioc: Adapter instance reference
- * @fwevt: Firmware event reference
- *
- * Extracts the event data and calls application interfacing
- * function to process the event further.
- *
- * Return: Nothing.
- */
-static void mpi3mr_logdata_evt_bh(struct mpi3mr_ioc *mrioc,
-	struct mpi3mr_fwevt *fwevt)
-{
-	mpi3mr_app_save_logdata(mrioc, fwevt->event_data,
-	    fwevt->event_data_size);
-}
-
-/**
  * mpi3mr_update_sdev_qd - Update SCSI device queue depath
  * @sdev: SCSI device reference
  * @data: Queue depth reference
@@ -2188,8 +2187,8 @@ static void mpi3mr_fwevt_bh(struct mpi3mr_ioc *mrioc,
 	if (!fwevt->process_event)
 		goto evt_ack;
 
-	dprint_event_bh(mrioc, "processing event(0x%02x) in the bottom half handler\n",
-	    fwevt->event_id);
+	dprint_event_bh(mrioc, "processing event(0x%02x)-(0x%08x) in the bottom half handler\n",
+	    fwevt->event_id, fwevt->event_context);
 	switch (fwevt->event_id) {
 	case MPI3_EVENT_DEVICE_ADDED:
 	{
@@ -2240,11 +2239,6 @@ static void mpi3mr_fwevt_bh(struct mpi3mr_ioc *mrioc,
 	case MPI3_EVENT_PCIE_TOPOLOGY_CHANGE_LIST:
 	{
 		mpi3mr_pcietopochg_evt_bh(mrioc, fwevt);
-		break;
-	}
-	case MPI3_EVENT_LOG_DATA:
-	{
-		mpi3mr_logdata_evt_bh(mrioc, fwevt);
 		break;
 	}
 	case MPI3MR_DRIVER_EVENT_WAIT_FOR_DEVICES_TO_REFRESH:
@@ -3019,12 +3013,14 @@ static void mpi3mr_preparereset_evt_th(struct mpi3mr_ioc *mrioc,
 		    "prepare for reset event top half with rc=start\n");
 		if (mrioc->prepare_for_reset)
 			return;
+		scsi_block_requests(mrioc->shost);
 		mrioc->prepare_for_reset = 1;
 		mrioc->prepare_for_reset_timeout_counter = 0;
 	} else if (evtdata->reason_code == MPI3_EVENT_PREPARE_RESET_RC_ABORT) {
 		dprint_event_th(mrioc,
 		    "prepare for reset top half with rc=abort\n");
 		mrioc->prepare_for_reset = 0;
+		scsi_unblock_requests(mrioc->shost);
 		mrioc->prepare_for_reset_timeout_counter = 0;
 	}
 	if ((event_reply->msg_flags & MPI3_EVENT_NOTIFY_MSGFLAGS_ACK_MASK)
@@ -3202,8 +3198,14 @@ void mpi3mr_os_handle_events(struct mpi3mr_ioc *mrioc,
 		mpi3mr_hdbstatuschg_evt_th(mrioc, event_reply);
 		break;
 	}
-	case MPI3_EVENT_DEVICE_INFO_CHANGED:
 	case MPI3_EVENT_LOG_DATA:
+	{
+		sz = event_reply->event_data_length * 4;
+		mpi3mr_app_save_logdata_th(mrioc,
+		    (char*)event_reply->event_data, sz);
+		break;
+	}
+	case MPI3_EVENT_DEVICE_INFO_CHANGED:
 	case MPI3_EVENT_ENCL_DEVICE_STATUS_CHANGE:
 	case MPI3_EVENT_ENCL_DEVICE_ADDED:
 	{
@@ -3231,8 +3233,8 @@ void mpi3mr_os_handle_events(struct mpi3mr_ioc *mrioc,
 	}
 	if (process_event_bh || ack_req) {
 		dprint_event_th(mrioc,
-		    "scheduling bottom half handler for event(0x%02x), ack_required=%d\n",
-		    evt_type, ack_req);
+		    "scheduling bottom half handler for event(0x%02x)-(0x%08x), ack_required=%d\n",
+		    evt_type, le32_to_cpu(event_reply->event_context), ack_req);
 		sz = event_reply->event_data_length * 4;
 		fwevt = mpi3mr_alloc_fwevt(sz);
 		if (!fwevt)
@@ -4253,11 +4255,13 @@ int mpi3mr_issue_tm(struct mpi3mr_ioc *mrioc, u8 tm_type,
 	if (scsi_tgt_priv_data)
 		atomic_inc(&scsi_tgt_priv_data->block_io);
 
-	if (tgtdev && (tgtdev->dev_type == MPI3_DEVICE_DEVFORM_PCIE)) {
-		if (cmd_priv && tgtdev->dev_spec.pcie_inf.abort_to)
-			timeout = tgtdev->dev_spec.pcie_inf.abort_to;
-		else if (!cmd_priv && tgtdev->dev_spec.pcie_inf.reset_to)
-			timeout = tgtdev->dev_spec.pcie_inf.reset_to;
+	if (tgtdev) {
+		if (tgtdev->dev_type == MPI3_DEVICE_DEVFORM_PCIE)
+			timeout = cmd_priv ? tgtdev->dev_spec.pcie_inf.abort_to
+					   : tgtdev->dev_spec.pcie_inf.reset_to;
+		else if (tgtdev->dev_type == MPI3_DEVICE_DEVFORM_VD)
+			timeout = cmd_priv ? tgtdev->dev_spec.vd_inf.abort_to
+					   : tgtdev->dev_spec.vd_inf.reset_to;
 	}
 
 	ioc_info(mrioc, "posting task management request: type(%d), handle(0x%04x)\n",
@@ -4611,7 +4615,21 @@ static int mpi3mr_eh_target_reset(struct scsi_cmnd *scmd)
 		sdev_printk(KERN_INFO, scmd->device,
 		    "%s: target has %d pending commands, target reset is failed\n",
 		    mrioc->name, stgt_priv_data->pend_count);
+
+#ifdef VALIDATION_SUPPORT_CODE
+		if ((mrioc->pdev->device != MPI3_MFGPAGE_DEVID_SAS4116)
+		    && (tm_failure_reset == true)) {
+			mpi3mr_print_pending_host_io(mrioc);
+			ret = mpi3mr_soft_reset_handler(mrioc,
+				MPI3MR_RESET_FROM_TR, 1);
+			if (ret)
+				goto out;
+		} else
+			goto out;
+#else
 		goto out;
+#endif
+
 	}
 
 	retval = SUCCESS;
@@ -4692,7 +4710,20 @@ static int mpi3mr_eh_dev_reset(struct scsi_cmnd *scmd)
 		sdev_printk(KERN_INFO, scmd->device,
 		    "%s: device has %d pending commands, device(LUN) reset is failed\n",
 		    mrioc->name, sdev_priv_data->pend_count);
+
+#ifdef VALIDATION_SUPPORT_CODE
+		if ((mrioc->pdev->device != MPI3_MFGPAGE_DEVID_SAS4116)
+		    && (tm_failure_reset == true)) {
+			mpi3mr_print_pending_host_io(mrioc);
+			ret = mpi3mr_soft_reset_handler(mrioc,
+				MPI3MR_RESET_FROM_DR, 1);
+			if (ret)
+				goto out;
+		} else
+			goto out;
+#else
 		goto out;
+#endif
 	}
 	retval = SUCCESS;
 out:
@@ -4780,7 +4811,20 @@ static int mpi3mr_eh_abort(struct scsi_cmnd *scmd)
 		sdev_printk(KERN_INFO, scmd->device,
 		    "%s: scmd was not terminated, abort task is failed\n",
 		    mrioc->name);
+
+#ifdef VALIDATION_SUPPORT_CODE
+		if ((mrioc->pdev->device != MPI3_MFGPAGE_DEVID_SAS4116)
+		    && (tm_failure_reset == true)) {
+			mpi3mr_print_pending_host_io(mrioc);
+			ret = mpi3mr_soft_reset_handler(mrioc,
+				MPI3MR_RESET_FROM_TA, 1);
+			if (ret)
+				goto out;
+		} else
+			goto out;
+#else
 		goto out;
+#endif
 	}
 	retval = SUCCESS;
 out:
@@ -5811,9 +5855,6 @@ mpi3mr_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	sprintf(mrioc->name, "%s%d", mrioc->driver_name, mrioc->id);
 	dev_info(&pdev->dev, "PCI device is: %s\n", mrioc->name);
 
-	/*AV2-TODO -- Remove this print when AV2 is GCAed*/
-	if (pdev->device != MPI3_MFGPAGE_DEVID_SAS4116)
-		dev_warn(&pdev->dev, "TECH PREVIEW: This controller may not be fully supported by this version of the driver\n");
 	INIT_LIST_HEAD(&mrioc->list);
 	spin_lock(&mrioc_list_lock);
 	list_add_tail(&mrioc->list, &mrioc_list);

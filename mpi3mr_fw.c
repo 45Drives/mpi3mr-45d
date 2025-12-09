@@ -39,6 +39,10 @@ module_param(threaded_isr_poll, bool, 0444);
 MODULE_PARM_DESC(threaded_isr_poll,
 	"Enablement of IRQ polling thread (default=true)");
 
+#ifdef VALIDATION_SUPPORT_CODE
+extern bool tm_failure_reset;
+#endif
+
 extern int enable_dix;
 
 static void mpi3mr_pel_wait_complete(struct mpi3mr_ioc *mrioc,
@@ -625,8 +629,8 @@ static void mpi3mr_process_admin_reply_desc(struct mpi3mr_ioc *mrioc,
 				    MPI3MR_SENSE_BUF_SZ);
 			}
 			if (cmdptr->is_waiting) {
-				complete(&cmdptr->done);
 				cmdptr->is_waiting = 0;
+				complete(&cmdptr->done);
 			} else if (cmdptr->callback)
 				cmdptr->callback(mrioc, cmdptr);
 		}
@@ -1282,6 +1286,11 @@ static const struct {
 		"timeout of a SAS transport layer request"
 	},
 	{ MPI3MR_RESET_FROM_TRIGGER, "automatic firmware diagnostic trigger"},
+#ifdef VALIDATION_SUPPORT_CODE
+	{ MPI3MR_RESET_FROM_TA, "task abort failure" },
+	{ MPI3MR_RESET_FROM_DR, "device reset failure" },
+	{ MPI3MR_RESET_FROM_TR, "target reset failure" },
+#endif
 	{ MPI3MR_RESET_FROM_INVALID_COMPLETION, "invalid cmd completion" },
 };
 
@@ -1901,6 +1910,8 @@ static int mpi3mr_issue_reset(struct mpi3mr_ioc *mrioc, u16 reset_type,
 	    MPI3MR_RESET_REASON_OSTYPE_SHIFT) | (mrioc->facts.ioc_num <<
 	    MPI3MR_RESET_REASON_IOCNUM_SHIFT) | reset_reason);
 	writel(scratch_pad0, &mrioc->sysif_regs->scratchpad[0]);
+	if (reset_type == MPI3_SYSIF_HOST_DIAG_RESET_ACTION_DIAG_FAULT)
+		mpi3mr_set_diagsave(mrioc);
 	writel(host_diagnostic | reset_type,
 	    &mrioc->sysif_regs->host_diagnostic);
 	switch (reset_type) {
@@ -2179,7 +2190,6 @@ void mpi3mr_check_rh_fault_ioc(struct mpi3mr_ioc *mrioc, u32 reason_code)
 		mpi3mr_print_fault_info(mrioc);
 		return;
 	}
-	mpi3mr_set_diagsave(mrioc);
 	mpi3mr_issue_reset(mrioc, MPI3_SYSIF_HOST_DIAG_RESET_ACTION_DIAG_FAULT,
 	    reason_code);
 	trigger_data.fault = (readl(&mrioc->sysif_regs->fault) &
@@ -3188,6 +3198,8 @@ static int mpi3mr_create_op_queues(struct mpi3mr_ioc *mrioc)
 {
 	int retval = 0;
 	u16 num_queues = 0, i = 0, msix_count_op_q = 1;
+	u32 ioc_status;
+	enum mpi3mr_iocstate ioc_state;
 
 	num_queues = min_t(int, mrioc->facts.max_op_reply_q,
 	    mrioc->facts.max_op_req_q);
@@ -3242,6 +3254,14 @@ static int mpi3mr_create_op_queues(struct mpi3mr_ioc *mrioc)
 
 	if (i == 0) {
 		/* Not even one queue is created successfully*/
+		retval = -1;
+		goto out_failed;
+	}
+	ioc_status = readl(&mrioc->sysif_regs->ioc_status);
+	ioc_state = mpi3mr_get_iocstate(mrioc);
+	if ((ioc_status & MPI3_SYSIF_IOC_STATUS_RESET_HISTORY) ||
+	    (ioc_state != MRIOC_STATE_READY)) {
+		mpi3mr_print_fault_info(mrioc);
 		retval = -1;
 		goto out_failed;
 	}
@@ -4919,9 +4939,21 @@ retry_bring_ioc_ready:
 			ioc_err(mrioc, "controller is not present at the bringup\n");
 			goto out_device_not_present;
 		}
-		msleep(100);
+		ssleep(1);
 		elapsed_time_sec = jiffies_to_msecs(jiffies - start_time)/1000;
 	} while (elapsed_time_sec < mrioc->ready_timeout);
+
+	ioc_state = mpi3mr_get_iocstate(mrioc);
+	if (ioc_state == MRIOC_STATE_READY)
+	{
+		ioc_info(mrioc,
+		    "successfully transitioned to %s state after %llu seconds\n",
+		    mpi3mr_iocstate_name(ioc_state), elapsed_time_sec);
+		/*Do not upstream the below change as the FW
+		 * will resolve this through an ER*/
+		mpi3mr_clear_reset_history(mrioc);
+		return 0;
+	}
 
 out_failed:
 	if (retval && (retry == 0)) {
@@ -6256,6 +6288,7 @@ int mpi3mr_soft_reset_handler(struct mpi3mr_ioc *mrioc,
 {
 	int retval = 0, i;
 	unsigned long flags;
+	enum mpi3mr_iocstate ioc_state;
 	u32 host_diagnostic, timeout = MPI3_SYSIF_DIAG_SAVE_TIMEOUT * 10;
 	union mpi3mr_trigger_data trigger_data;
 
@@ -6287,6 +6320,7 @@ int mpi3mr_soft_reset_handler(struct mpi3mr_ioc *mrioc,
 	    mpi3mr_reset_rc_name(reset_reason));
 
 	mrioc->device_refresh_on = 0;
+	scsi_block_requests(mrioc->shost);
 	mrioc->reset_in_progress = 1;
 	mrioc->block_bsgs = 1;
 	mrioc->prev_reset_result = -1;
@@ -6306,7 +6340,13 @@ int mpi3mr_soft_reset_handler(struct mpi3mr_ioc *mrioc,
 		mpi3mr_issue_event_notification(mrioc);
 	}
 
+#ifdef VALIDATION_SUPPORT_CODE
+	if ((mrioc->pdev->device == MPI3_MFGPAGE_DEVID_SAS4116) ||
+	    (tm_failure_reset == false))
+		mpi3mr_wait_for_host_io(mrioc, MPI3MR_RESET_HOST_IOWAIT_TIMEOUT);
+#else
 	mpi3mr_wait_for_host_io(mrioc, MPI3MR_RESET_HOST_IOWAIT_TIMEOUT);
+#endif
 	mpi3mr_ioc_disable_intr(mrioc);
 	mrioc->io_admin_reset_sync = 1;
 
@@ -6314,7 +6354,6 @@ int mpi3mr_soft_reset_handler(struct mpi3mr_ioc *mrioc,
 		dprint_reset(mrioc,
 		    "soft_reset_handler: saving snapdump\n");
 		mpi3mr_do_dump(mrioc);
-		mpi3mr_set_diagsave(mrioc);
 		retval = mpi3mr_issue_reset(mrioc,
 		    MPI3_SYSIF_HOST_DIAG_RESET_ACTION_DIAG_FAULT, reset_reason);
 		if (!retval) {
@@ -6391,6 +6430,7 @@ out:
 	if (!retval) {
 		mrioc->diagsave_timeout = 0;
 		mrioc->reset_in_progress = 0;
+		scsi_unblock_requests(mrioc->shost);
 		mrioc->pel_abort_requested = 0;
 		if (mrioc->pel_enabled) {
 			mrioc->pel_cmds.retry_count = 0;
@@ -6412,11 +6452,15 @@ out:
 	} else {
 		dprint_reset(mrioc,
 		    "soft_reset_handler failed, marking controller as unrecoverable\n");
-		mpi3mr_issue_reset(mrioc,
-		    MPI3_SYSIF_HOST_DIAG_RESET_ACTION_DIAG_FAULT, reset_reason);
+		ioc_state = mpi3mr_get_iocstate(mrioc);
+		if (ioc_state != MRIOC_STATE_FAULT)
+			mpi3mr_issue_reset(mrioc,
+			    MPI3_SYSIF_HOST_DIAG_RESET_ACTION_DIAG_FAULT,
+			    reset_reason);
 		mrioc->device_refresh_on = 0;
 		mrioc->unrecoverable = 1;
 		mrioc->reset_in_progress = 0;
+		scsi_unblock_requests(mrioc->shost);
 		mrioc->block_bsgs = 0;
 		retval = -1;
 		mpi3mr_flush_cmds_for_unrecovered_controller(mrioc);
