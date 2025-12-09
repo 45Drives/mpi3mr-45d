@@ -1,4 +1,4 @@
-FROM debian:12
+FROM debian:13
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -27,7 +27,7 @@ ENTRYPOINT [ "/entrypoint.sh" ]
 
 COPY docker/proxmox.sources /etc/apt/sources.list.d/
 
-RUN sed -i 's/^Suites:.*/Suites: bookworm/' /etc/apt/sources.list.d/proxmox.sources
+RUN sed -i 's/^Suites:.*/Suites: trixie/' /etc/apt/sources.list.d/proxmox.sources
 
 RUN wget https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg -O /usr/share/keyrings/proxmox-archive-keyring.gpg && \
     apt-get -y update && \
