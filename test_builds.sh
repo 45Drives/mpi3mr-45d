@@ -36,7 +36,7 @@ for dockerfile in ./docker/*.dockerfile; do
     IMAGE="${IMAGE%.dockerfile}"
     printf '%s' "$IMAGE..."
     IMAGE="mpi3mr-builder-$IMAGE"
-    docker build -t "$IMAGE" --file "$dockerfile" . >/dev/null 2>&1
+    docker build --pull -t "$IMAGE" --file "$dockerfile" . >/dev/null 2>&1
     echo 'done'
     IMAGES+=("$IMAGE")
 done
@@ -53,7 +53,7 @@ for image in "${IMAGES[@]}"; do
     OS_NAME=${image#mpi3mr-builder-}
     mkdir -p "$SCRIPT_DIR/test_builds_out/$OS_NAME"
     echo "$OS_NAME: {"
-    if docker run -it --rm --volume "$SCRIPT_DIR":/src:ro --volume "$SCRIPT_DIR/test_builds_out/$OS_NAME:/out" "$image" | sed 's/^/  /'; then
+    if stdbuf -oL docker run -it --rm --volume "$SCRIPT_DIR":/src:ro --volume "$SCRIPT_DIR/test_builds_out/$OS_NAME:/out" "$image" | sed 's/^/  /'; then
         echo "} PASSED"
     else
         RESULT=$?
