@@ -1,4 +1,5 @@
 # mpi3mr-dkms (45Drives patch)
+Build test status: ![Tests](https://github.com/45Drives/mpi3mr-45d/actions/workflows/tests.yml/badge.svg?branch=main)
 
 DKMS package of the mpi3mr driver, patched to expose slot number for array devices.
 
