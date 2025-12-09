@@ -209,6 +209,38 @@ void mpi3mr_hdbstatuschg_evt_th(struct mpi3mr_ioc *mrioc,
 }
 
 /**
+ * mpi3mr_app_save_logdata_th - Save Log Data events
+ * @mrioc: Adapter instance reference
+ * @event_data: event data associated with log data event
+ * @event_data_size: event data size to copy
+ *
+ * If log data event caching is enabled by the applicatiobns,
+ * then this function saves the log data in the circular queue
+ * and Sends async signal SIGIO to indicate there is an async
+ * event from the firmware to the event monitoring applications.
+ *
+ * Return:Nothing
+ */
+void mpi3mr_app_save_logdata_th(struct mpi3mr_ioc *mrioc, char *event_data,
+    u16 event_data_size)
+{
+	u32 index = mrioc->logdata_buf_idx, sz;
+	struct mpi3mr_logdata_entry *entry;
+
+	if (!(mrioc->logdata_buf))
+		return;
+
+	entry = (struct mpi3mr_logdata_entry *)
+		(mrioc->logdata_buf + (index * mrioc->logdata_entry_sz));
+	entry->valid_entry = 1;
+	sz = min(mrioc->logdata_entry_sz, event_data_size);
+	memcpy(entry->data, event_data, sz);
+	mrioc->logdata_buf_idx =
+		((++index) % MPI3MR_BSG_LOGDATA_MAX_ENTRIES);
+	atomic64_inc(&event_counter);
+}
+
+/**
  * mpi3mr_alloc_trace_buffer:	Allocate segmented trace buffer
  * @mrioc: Adapter instance reference
  * @trace_size: Trace buffer size
@@ -3082,38 +3114,6 @@ static int mpi3mr_bsg_request(struct bsg_job *job)
 }
 
 /**
- * mpi3mr_app_save_logdata - Save Log Data events
- * @mrioc: Adapter instance reference
- * @event_data: event data associated with log data event
- * @event_data_size: event data size to copy
- *
- * If log data event caching is enabled by the applicatiobns,
- * then this function saves the log data in the circular queue
- * and Sends async signal SIGIO to indicate there is an async
- * event from the firmware to the event monitoring applications.
- *
- * Return:Nothing
- */
-void mpi3mr_app_save_logdata(struct mpi3mr_ioc *mrioc, char *event_data,
-    u16 event_data_size)
-{
-	u32 index = mrioc->logdata_buf_idx, sz;
-	struct mpi3mr_logdata_entry *entry;
-
-	if (!(mrioc->logdata_buf))
-		return;
-
-	entry = (struct mpi3mr_logdata_entry *)
-		(mrioc->logdata_buf + (index * mrioc->logdata_entry_sz));
-	entry->valid_entry = 1;
-	sz = min(mrioc->logdata_entry_sz, event_data_size);
-	memcpy(entry->data, event_data, sz);
-	mrioc->logdata_buf_idx =
-		((++index) % MPI3MR_BSG_LOGDATA_MAX_ENTRIES);
-	atomic64_inc(&event_counter);
-}
-
-/**
  * mpi3mr_bsg_exit - de-registration from bsg layer
  * @mrioc: Adapter instance reference
  *
@@ -3152,7 +3152,8 @@ static void mpi3mr_bsg_queue_creation(struct mpi3mr_ioc *mrioc,
     struct device *bsg_dev)
 {
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0))
+#if ((LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)) && \
+     !(defined(RHEL_MAJOR) && (RHEL_MAJOR == 9) && (RHEL_MINOR >= 6)))
 	mrioc->bsg_queue = bsg_setup_queue(bsg_dev, dev_name(bsg_dev),
 	    mpi3mr_bsg_request, SETUP_QUEUE_ARG);
 	if (IS_ERR(mrioc->bsg_queue)) {

@@ -33,7 +33,13 @@
 #include <linux/uaccess.h>
 #include <linux/version.h>
 #include <linux/utsname.h>
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0))
 #include <asm/unaligned.h>
+#else
+#include <linux/unaligned.h>
+#endif
+
 #include <linux/kmsg_dump.h>
 #include <linux/vmalloc.h>
 
@@ -68,8 +74,9 @@ extern spinlock_t mrioc_list_lock;
 extern struct list_head mrioc_list;
 extern atomic64_t event_counter;
 
-#define MPI3MR_DRIVER_VERSION	"8.13.1.0.0"
-#define MPI3MR_DRIVER_RELDATE	"23-April-2025"
+#define MPI3MR_DRIVER_VERSION	"8.15.1.0.0"
+#define MPI3MR_DRIVER_RELDATE	"17-October-2025"
+
 
 #define MPI3MR_DRIVER_NAME	"mpi3mr"
 #define MPI3MR_DRIVER_LICENSE	"GPL"
@@ -288,6 +295,11 @@ enum mpi3mr_reset_reason {
 	MPI3MR_RESET_FROM_CFG_REQ_TIMEOUT = 29,
 	MPI3MR_RESET_FROM_SAS_TRANSPORT_TIMEOUT = 30,
 	MPI3MR_RESET_FROM_TRIGGER = 31,
+#ifdef VALIDATION_SUPPORT_CODE
+	MPI3MR_RESET_FROM_TA = 32,
+	MPI3MR_RESET_FROM_DR = 33,
+	MPI3MR_RESET_FROM_TR = 34,
+#endif
 	MPI3MR_RESET_FROM_INVALID_COMPLETION = 35,
 };
 
@@ -726,6 +738,8 @@ struct tgt_dev_pcie {
  * @tg_id: VDs throttle group ID
  * @tg_high: High limit to turn on throttling in 512 byte blocks
  * @tg_low: Low limit to turn off throttling in 512 byte blocks
+ * @abort_to: Timeout for abort TM
+ * @reset_to: Timeout for Target/LUN reset TM
  * @tg: Pointer to throttle group info
  */
 struct tgt_dev_vd {
@@ -734,6 +748,8 @@ struct tgt_dev_vd {
 	u16 tg_id;
 	u32 tg_high;
 	u32 tg_low;
+	u8 abort_to;
+	u8 reset_to;
 	struct mpi3mr_throttle_group_info *tg;
 };
 
@@ -1539,7 +1555,7 @@ void mpi3mr_flush_delayed_cmd_lists(struct mpi3mr_ioc *mrioc);
 
 void mpi3mr_bsg_init(struct mpi3mr_ioc *mrioc);
 void mpi3mr_bsg_exit(struct mpi3mr_ioc *mrioc);
-void mpi3mr_app_save_logdata(struct mpi3mr_ioc *mrioc, char *event_data,
+void mpi3mr_app_save_logdata_th(struct mpi3mr_ioc *mrioc, char *event_data,
     u16 event_data_size);
 int mpi3mr_process_op_reply_q(struct mpi3mr_ioc *mrioc,
     struct op_reply_qinfo *op_reply_q);
