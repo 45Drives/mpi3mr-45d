@@ -31,14 +31,26 @@ cat <<EOF
 ################################
 EOF
 
+build_pids=()
+
 for dockerfile in ./docker/*.dockerfile; do
     IMAGE="${dockerfile#./docker/}"
     IMAGE="${IMAGE%.dockerfile}"
-    printf '%s' "$IMAGE..."
     IMAGE="mpi3mr-builder-$IMAGE"
+    (
+    echo "building $IMAGE..."
     docker build --pull -t "$IMAGE" --file "$dockerfile" . >/dev/null 2>&1
-    echo 'done'
+    echo "$IMAGE done"
+    ) &
+    build_pids+=($!)
+
     IMAGES+=("$IMAGE")
+done
+
+for pid in "${build_pids[@]}"; do
+    if ! wait "$pid"; then
+        exit $?
+    fi
 done
 
 cat <<EOF
@@ -53,7 +65,7 @@ for image in "${IMAGES[@]}"; do
     OS_NAME=${image#mpi3mr-builder-}
     mkdir -p "$SCRIPT_DIR/test_builds_out/$OS_NAME"
     echo "$OS_NAME: {"
-    if stdbuf -oL docker run -it --rm --volume "$SCRIPT_DIR":/src:ro --volume "$SCRIPT_DIR/test_builds_out/$OS_NAME:/out" "$image" | sed 's/^/  /'; then
+    if docker run -it --rm --volume "$SCRIPT_DIR":/src:ro --volume "$SCRIPT_DIR/test_builds_out/$OS_NAME:/out" "$image" | sed 's/^/  /'; then
         echo "} PASSED"
     else
         RESULT=$?
