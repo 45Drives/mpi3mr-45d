@@ -1,3 +1,3 @@
-## mpi3mr 8.13.1.0.0-45d6
+## mpi3mr 8.15.1.0.0-45d1
 
-* Add proxmox-default-headers dependency for newer PVE
+* Update upstream driver to 8.15.1.0.0

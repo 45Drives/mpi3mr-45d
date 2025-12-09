@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.15.1.0.0-45d1bookworm) bookworm; urgency=medium
+
+  * Update upstream driver to 8.15.1.0.0
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 09 Dec 2025 14:09:39 -0400
+
 mpi3mr-dkms (8.13.1.0.0-45d6bookworm) bookworm; urgency=medium
 
   * Add proxmox-default-headers dependency for newer PVE
