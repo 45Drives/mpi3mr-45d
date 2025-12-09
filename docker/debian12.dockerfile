@@ -31,6 +31,5 @@ RUN sed -i 's/^Suites:.*/Suites: bookworm/' /etc/apt/sources.list.d/proxmox.sour
 
 RUN wget https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg -O /usr/share/keyrings/proxmox-archive-keyring.gpg && \
     apt-get -y update && \
-    apt-key add /usr/share/keyrings/proxmox-archive-keyring.gpg && \
     apt-get install -y pve-headers && \
     rm -rf /var/lib/apt/lists/*
