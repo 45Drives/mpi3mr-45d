@@ -28,7 +28,7 @@ test_build() {
         KERNEL="$(realpath "$KERNEL")"
         KERNEL_NAME="$(basename "$KERNEL")"
         printf '%s: ' "$KERNEL_NAME"
-        if make -j"$(nproc)" CONFIG_DEBUG_INFO=1 -C "$KERNEL" M=/build > "/out/$KERNEL_NAME.log" 2>&1; then
+        if make -j"$(nproc)" CONFIG_DEBUG_INFO=1 CONFIG_DEBUG_INFO_BTF_MODULES= -C "$KERNEL" M=/build > "/out/$KERNEL_NAME.log" 2>&1; then
             echo PASSED
         else
             RESULT=$?
