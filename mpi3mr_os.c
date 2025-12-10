@@ -4451,7 +4451,11 @@ static int mpi3mr_map_queues(struct Scsi_Host *shost)
 		 */
 		map->queue_offset = qoff;
 		if (i != HCTX_TYPE_POLL)
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)) || (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9) && (RHEL_MINOR >= 7)))
+			blk_mq_map_hw_queues(map, &mrioc->pdev->dev, offset);
+#else
 			blk_mq_pci_map_queues(map, mrioc->pdev, offset);
+#endif
 		else
 			blk_mq_map_queues(map);
 

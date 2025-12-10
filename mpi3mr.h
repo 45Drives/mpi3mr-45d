@@ -16,7 +16,7 @@
 #include <linux/errno.h>
 #include <linux/blkdev.h>
 #include <linux/blk-mq.h>
-#include <linux/blk-mq-pci.h>
+
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <linux/delay.h>
@@ -33,6 +33,11 @@
 #include <linux/uaccess.h>
 #include <linux/version.h>
 #include <linux/utsname.h>
+
+// header removed in 6.14, backported to rhel 9.7
+#if !((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)) || (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9) && (RHEL_MINOR >= 7)))
+#include <linux/blk-mq-pci.h>
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0))
 #include <asm/unaligned.h>
