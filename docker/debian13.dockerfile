@@ -25,11 +25,13 @@ WORKDIR /build
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 
-COPY docker/proxmox.sources /etc/apt/sources.list.d/
+# SKIPPING PVE9 FOR NOW !!!!
 
-RUN sed -i 's/^Suites:.*/Suites: trixie/' /etc/apt/sources.list.d/proxmox.sources
+# COPY docker/proxmox.sources /etc/apt/sources.list.d/
 
-RUN wget https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg -O /usr/share/keyrings/proxmox-archive-keyring.gpg && \
-    apt-get -y update && \
-    apt-get install -y pve-headers && \
-    rm -rf /var/lib/apt/lists/*
+# RUN sed -i 's/^Suites:.*/Suites: trixie/' /etc/apt/sources.list.d/proxmox.sources
+
+# RUN wget https://enterprise.proxmox.com/debian/proxmox-archive-keyring-trixie.gpg -O /usr/share/keyrings/proxmox-archive-keyring.gpg && \
+#     apt-get -y update && \
+#     apt-get install -y pve-headers && \
+#     rm -rf /var/lib/apt/lists/*
