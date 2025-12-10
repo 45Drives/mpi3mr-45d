@@ -14,14 +14,19 @@
     },
     "architecture": {
         "rocky": "noarch",
-        "debian": "all",
+        "debian": "amd64",
         "ubuntu": "all"
     },
     "dependencies": {
         "ubuntu_common": [
             "dkms",
             "patch",
-            "proxmox-default-headers | pve-headers | linux-headers-generic | linux-headers-amd64 [amd64] | linux-headers-arm64 [arm64]"
+            "linux-headers-generic"
+        ],
+        "debian_common": [
+            "dkms",
+            "patch",
+            "proxmox-default-headers | pve-headers | linux-headers-amd64"
         ],
         "rocky_common": [
             "dkms",
