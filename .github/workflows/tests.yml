@@ -17,11 +17,15 @@ jobs:
       - name: Run test script
         run: ./test_builds.sh
 
+      - name: Set artifact timestamp
+        if: always()
+        run: echo "TS=$(date +'%Y%m%d-%H%M%S')" >> "$GITHUB_ENV"
+
       - name: Upload logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-build-logs
+          name: mpi3mr-test-build-logs_${{ env.TS }}
           path: |
             test_builds_out/**/*.log
             test_builds_out.log
