@@ -1,4 +1,4 @@
-FROM rockylinux/rockylinux:8-minimal
+FROM rockylinux:8-minimal
 
 RUN microdnf -y install dnf dnf-plugins-core && \
     dnf -y groupinstall 'Development Tools' && \

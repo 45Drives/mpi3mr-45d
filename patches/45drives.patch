@@ -1,29 +1,8 @@
 diff --git a/mpi3mr.h b/mpi3mr.h
-index 465e3f2..b704ebd 100755
+index 9bf3c05..8e8a10e 100755
 --- a/mpi3mr.h
 +++ b/mpi3mr.h
-@@ -16,7 +16,7 @@
- #include <linux/errno.h>
- #include <linux/blkdev.h>
- #include <linux/blk-mq.h>
--#include <linux/blk-mq-pci.h>
-+
- #include <linux/sched.h>
- #include <linux/workqueue.h>
- #include <linux/delay.h>
-@@ -34,6 +34,11 @@
- #include <linux/version.h>
- #include <linux/utsname.h>
- 
-+// header removed in 6.14, backported to rhel 9.7
-+#if !((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)) || (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9) && (RHEL_MINOR >= 7)))
-+#include <linux/blk-mq-pci.h>
-+#endif
-+
- #if (LINUX_VERSION_CODE < KERNEL_VERSION(6, 12, 0))
- #include <asm/unaligned.h>
- #else
-@@ -58,6 +63,11 @@
+@@ -64,6 +64,11 @@
  #include <scsi/scsi_dbg.h>
  #include <scsi/scsi_transport_sas.h>
  
@@ -35,20 +14,20 @@ index 465e3f2..b704ebd 100755
  #include "mpi/mpi30_transport.h"
  #include "mpi/mpi30_cnfg.h"
  #include "mpi/mpi30_image.h"
-@@ -74,7 +84,7 @@ extern spinlock_t mrioc_list_lock;
+@@ -80,7 +85,7 @@ extern spinlock_t mrioc_list_lock;
  extern struct list_head mrioc_list;
  extern atomic64_t event_counter;
  
--#define MPI3MR_DRIVER_VERSION	"8.15.1.0.0"
-+#define MPI3MR_DRIVER_VERSION	"8.15.1.0.0-45d1"
- #define MPI3MR_DRIVER_RELDATE	"17-October-2025"
+-#define MPI3MR_DRIVER_VERSION	"8.17.1.0.0"
++#define MPI3MR_DRIVER_VERSION	"8.17.1.0.0-45d1"
+ #define MPI3MR_DRIVER_RELDATE	"07-April-2026"
  
  
 diff --git a/mpi3mr_app.c b/mpi3mr_app.c
-index 0dd372e..5ca22f1 100755
+index 495470e..05ece6e 100755
 --- a/mpi3mr_app.c
 +++ b/mpi3mr_app.c
-@@ -3959,6 +3959,38 @@ persistent_id_show(struct device *dev, struct device_attribute *attr,
+@@ -3970,6 +3970,38 @@ persistent_id_show(struct device *dev, struct device_attribute *attr,
  }
  static DEVICE_ATTR_RO(persistent_id);
  
@@ -87,7 +66,7 @@ index 0dd372e..5ca22f1 100755
  #if ((KERNEL_VERSION(5, 16, 0) <= LINUX_VERSION_CODE) || \
  	(defined(CONFIG_SUSE_KERNEL) && \
  	((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
-@@ -3967,6 +3999,7 @@ static struct attribute *mpi3mr_dev_attrs[] = {
+@@ -3978,6 +4010,7 @@ static struct attribute *mpi3mr_dev_attrs[] = {
  	&dev_attr_sas_address.attr,
  	&dev_attr_device_handle.attr,
  	&dev_attr_persistent_id.attr,
@@ -95,7 +74,7 @@ index 0dd372e..5ca22f1 100755
  	NULL,
  };
  
-@@ -3986,8 +4019,8 @@ struct device_attribute *mpi3mr_dev_attrs[] = {
+@@ -3997,8 +4030,8 @@ struct device_attribute *mpi3mr_dev_attrs[] = {
  	&dev_attr_sas_address,
  	&dev_attr_device_handle,
  	&dev_attr_persistent_id,
@@ -106,7 +85,7 @@ index 0dd372e..5ca22f1 100755
  #endif
 -
 diff --git a/mpi3mr_kernel_compat.h b/mpi3mr_kernel_compat.h
-index 55279c5..27241a3 100755
+index 611a6a4..be5bc69 100755
 --- a/mpi3mr_kernel_compat.h
 +++ b/mpi3mr_kernel_compat.h
 @@ -143,6 +143,18 @@ static inline void mpi3mr_scsi_build_sense(struct scsi_cmnd *scmd,
@@ -133,19 +112,3 @@ index 55279c5..27241a3 100755
  #define MPI3MR_MAX_PAGE_ORDER 10
  #endif
 -
-diff --git a/mpi3mr_os.c b/mpi3mr_os.c
-index fcf02e3..3f1be52 100755
---- a/mpi3mr_os.c
-+++ b/mpi3mr_os.c
-@@ -4451,7 +4451,11 @@ static int mpi3mr_map_queues(struct Scsi_Host *shost)
- 		 */
- 		map->queue_offset = qoff;
- 		if (i != HCTX_TYPE_POLL)
-+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)) || (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9) && (RHEL_MINOR >= 7)))
-+			blk_mq_map_hw_queues(map, &mrioc->pdev->dev, offset);
-+#else
- 			blk_mq_pci_map_queues(map, mrioc->pdev, offset);
-+#endif
- 		else
- 			blk_mq_map_queues(map);
- 

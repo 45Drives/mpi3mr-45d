@@ -40,7 +40,9 @@ for dockerfile in ./docker/*.dockerfile; do
     (
     echo "building $IMAGE..."
     docker build --pull -t "$IMAGE" --file "$dockerfile" . >/dev/null 2>&1
-    echo "$IMAGE done"
+    result=$?
+    echo "$IMAGE done ($result)"
+    exit $result
     ) &
     build_pids+=($!)
 
@@ -49,7 +51,9 @@ done
 
 for pid in "${build_pids[@]}"; do
     if ! wait "$pid"; then
-        exit $?
+        result=$?
+        echo "Build failed with PID $pid" >&2
+        exit $result
     fi
 done
 

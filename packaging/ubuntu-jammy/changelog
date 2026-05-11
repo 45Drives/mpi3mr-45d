@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.17.1.0.0-45d1jammy) jammy; urgency=medium
+
+  * Update upstream driver to 8.17.1.0.0
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Mon, 11 May 2026 09:14:44 -0300
+
 mpi3mr-dkms (8.15.1.0.0-45d1jammy) jammy; urgency=medium
 
   * Update upstream driver to 8.15.1.0.0
