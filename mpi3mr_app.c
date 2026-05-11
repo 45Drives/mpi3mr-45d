@@ -2,7 +2,7 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2025 Broadcom Inc.
+ * Copyright (C) 2017-2026 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
@@ -3397,6 +3397,15 @@ adp_state_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(adp_state);
 
+static ssize_t
+fwfault_count_show(struct device *dev, struct device_attribute *attr,
+	char *buf)
+{
+	struct Scsi_Host *shost = class_to_shost(dev);
+	struct mpi3mr_ioc *mrioc = shost_priv(shost);
+	return snprintf(buf, PAGE_SIZE, "%llu\n", mrioc->fwfault_counter);
+}
+static DEVICE_ATTR_RO(fwfault_count);
 
 /**
  * mpi3mr_app_complete_tm - SysFS TM completion callback
@@ -3731,6 +3740,7 @@ static struct attribute *mpi3mr_host_attrs[] = {
 	&dev_attr_reply_qfull_count.attr,
 	&dev_attr_logging_level.attr,
 	&dev_attr_adp_state.attr,
+	&dev_attr_fwfault_count.attr,
 	&dev_attr_task_management.attr,
 	NULL,
 };
@@ -3754,6 +3764,7 @@ struct device_attribute *mpi3mr_host_attrs[] = {
 	&dev_attr_reply_qfull_count,
 	&dev_attr_logging_level,
 	&dev_attr_adp_state,
+	&dev_attr_fwfault_count,
 	&dev_attr_task_management,
 	NULL,
 };

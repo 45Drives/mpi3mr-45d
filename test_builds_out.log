@@ -1,0 +1,68 @@
+################################
+# BUILDING IMAGES
+################################
+building mpi3mr-builder-debian12...
+building mpi3mr-builder-debian13...
+building mpi3mr-builder-rocky8...
+building mpi3mr-builder-rocky9...
+building mpi3mr-builder-ubuntu20...
+building mpi3mr-builder-ubuntu22...
+mpi3mr-builder-rocky9 done
+mpi3mr-builder-ubuntu20 done
+mpi3mr-builder-debian13 done
+mpi3mr-builder-rocky8 done
+mpi3mr-builder-ubuntu22 done
+mpi3mr-builder-debian12 done
+################################
+# TESTING BUILDS
+################################
+debian12: {
+  unpatched {
+    linux-headers-6.1.0-41-amd64: PASSED
+    linux-headers-6.8.12-17-pve: PASSED
+  } PASSED
+  patched {
+    linux-headers-6.1.0-41-amd64: PASSED
+    linux-headers-6.8.12-17-pve: PASSED
+  } PASSED
+} PASSED
+debian13: {
+  unpatched {
+    linux-headers-6.12.57+deb13-amd64: PASSED
+  } PASSED
+  patched {
+    linux-headers-6.12.57+deb13-amd64: PASSED
+  } PASSED
+} PASSED
+rocky8: {
+  unpatched {
+    4.18.0-553.85.1.el8_10.x86_64: PASSED
+  } PASSED
+  patched {
+    4.18.0-553.85.1.el8_10.x86_64: PASSED
+  } PASSED
+} PASSED
+rocky9: {
+  unpatched {
+    5.14.0-611.11.1.el9_7.x86_64: FAILED (see '5.14.0-611.11.1.el9_7.x86_64.log')
+  } FAILED
+  patched {
+    5.14.0-611.11.1.el9_7.x86_64: PASSED
+  } PASSED
+} PASSED
+ubuntu20: {
+  unpatched {
+    linux-headers-5.4.0-216-generic: PASSED
+  } PASSED
+  patched {
+    linux-headers-5.4.0-216-generic: PASSED
+  } PASSED
+} PASSED
+ubuntu22: {
+  unpatched {
+    linux-headers-5.15.0-163-generic: PASSED
+  } PASSED
+  patched {
+    linux-headers-5.15.0-163-generic: PASSED
+  } PASSED
+} PASSED
