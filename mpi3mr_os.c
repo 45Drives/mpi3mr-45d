@@ -2,7 +2,7 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2025 Broadcom Inc.
+ * Copyright (C) 2017-2026 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
@@ -1290,11 +1290,12 @@ mpi3mr_debug_dump_devpg0(struct mpi3mr_ioc *mrioc, struct mpi3_device_page0 *dev
 		struct mpi3_device0_sas_sata_format *sasinf =
 		    &dev_pg0->device_specific.sas_sata_format;
 		ioc_info(mrioc,
-		    "device_pg0: sas_sata: sas_address(0x%016llx),flags(0x%04x), device_info(0x%04x), phy_num(%d), attached_phy_id(%d)\n",
+		    "device_pg0: sas_sata: sas_address(0x%016llx),flags(0x%04x),\n"
+		    "device_info(0x%04x), phy_num(%d), attached_phy_id(%d),negotiated_link_rate(0x%02x)\n",
 		    le64_to_cpu(sasinf->sas_address),
 		    le16_to_cpu(sasinf->flags),
 		    le16_to_cpu(sasinf->device_info), sasinf->phy_num,
-		    sasinf->attached_phy_identifier);
+		    sasinf->attached_phy_identifier, sasinf->negotiated_link_rate);
 		break;
 	}
 	case MPI3_DEVICE_DEVFORM_PCIE:
@@ -1385,6 +1386,9 @@ static void mpi3mr_update_tgtdev(struct mpi3mr_ioc *mrioc,
 		tgtdev->io_throttle_enabled =
 		    (flags & MPI3_DEVICE0_FLAGS_IO_THROTTLING_REQUIRED) ? 1 : 0;
 
+	if(!mrioc->sas_transport_enabled)
+		tgtdev->non_stl = 1;
+
 	switch (flags & MPI3_DEVICE0_FLAGS_MAX_WRITE_SAME_MASK) {
 	case MPI3_DEVICE0_FLAGS_MAX_WRITE_SAME_256_LB:
 		tgtdev->wslen = MPI3MR_WRITE_SAME_MAX_LEN_256_BLKS;
@@ -1436,6 +1440,9 @@ static void mpi3mr_update_tgtdev(struct mpi3mr_ioc *mrioc,
 		tgtdev->dev_spec.sas_sata_inf.phy_id = sasinf->phy_num;
 		tgtdev->dev_spec.sas_sata_inf.attached_phy_id =
 			sasinf->attached_phy_identifier;
+		tgtdev->dev_spec.sas_sata_inf.negotiated_link_rate =
+			sasinf->negotiated_link_rate;
+
 		if ((dev_info & MPI3_SAS_DEVICE_INFO_DEVICE_TYPE_MASK)
 		    != MPI3_SAS_DEVICE_INFO_DEVICE_TYPE_END_DEVICE)
 			tgtdev->is_hidden = 1;
@@ -3974,16 +3981,37 @@ static int mpi3mr_prepare_sg_scmd(struct mpi3mr_ioc *mrioc,
 		priv->meta_sg_valid = 1; /* To unmap meta sg DMA */
 	} else {
 		/*
-		 * Some firmware versions byte-swap the report zone command
-		 * reply from ATA-ZAC devices by directly accessing in the host
-		 * buffer. This does not respect the default command DMA
-		 * direction and causes IOMMU page faults on some architectures
-		 * with an IOMMU enforcing write mappings (e.g. AMD hosts).
-		 * Avoid such issue by making the report zones buffer mapping
-		 * bi-directional.
+		 * Some commands require bidirectional DMA mappings to handle cases where
+		 * the device may read and write to the same data buffer. This includes:
+		 * - SECURITY_PROTOCOL_IN commands
+		 * - ZBC_IN with REPORT_ZONES service action
+		 * - SERVICE_ACTION_IN_16 with service action 0x17
+		 *
+		 * Such handling prevents IOMMU page faults on architectures enforcing strict
+		 * DMA direction mappings.
+		 *
+		 * Note: This workaround will not be upstreamed.
 		 */
-		if (scmd->cmnd[0] == ZBC_IN && scmd->cmnd[1] == ZI_REPORT_ZONES)
+
+	switch (scmd->cmnd[0]) {
+
+	case SECURITY_PROTOCOL_IN:
+		scmd->sc_data_direction = DMA_BIDIRECTIONAL;
+		break;
+
+	case ZBC_IN:
+		if (scmd->cmnd[1] == ZI_REPORT_ZONES)
 			scmd->sc_data_direction = DMA_BIDIRECTIONAL;
+		break;
+
+	case SERVICE_ACTION_IN_16:
+		if (scmd->cmnd[1] == 0x17)
+			scmd->sc_data_direction = DMA_BIDIRECTIONAL;
+		break;
+
+	default:
+		break;
+	}
 		sg_scmd = scsi_sglist(scmd);
 		sges_left = scsi_dma_map(scmd);
 	}
@@ -4451,7 +4479,10 @@ static int mpi3mr_map_queues(struct Scsi_Host *shost)
 		 */
 		map->queue_offset = qoff;
 		if (i != HCTX_TYPE_POLL)
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)) || (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9) && (RHEL_MINOR >= 7)))
+#if (defined(CONFIG_SUSE_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6,12,0))) || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(6,14,0)) || \
+	(defined(RHEL_MAJOR) && (RHEL_MAJOR == 9) && (RHEL_MINOR >= 7)) || \
+	(defined(RHEL_MAJOR) && (RHEL_MAJOR == 10) && (RHEL_MINOR >= 1))
 			blk_mq_map_hw_queues(map, &mrioc->pdev->dev, offset);
 #else
 			blk_mq_pci_map_queues(map, mrioc->pdev, offset);
@@ -4951,14 +4982,14 @@ static int mpi3mr_scan_finished(struct Scsi_Host *shost,
 }
 
 /**
- * mpi3mr_slave_destroy - Slave destroy callback handler
+ * mpi3mr_sdev_destroy - Device destroy callback handler
  * @sdev: SCSI device reference
  *
  * Cleanup and free per device(lun) private data.
  *
  * Return: Nothing.
  */
-static void mpi3mr_slave_destroy(struct scsi_device *sdev)
+static void mpi3mr_sdev_destroy(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost;
 	struct mpi3mr_ioc *mrioc;
@@ -5040,7 +5071,7 @@ static void mpi3mr_target_destroy(struct scsi_target *starget)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0))
 /**
- * mpi3mr_device_configure - Device configure callback handler
+ * mpi3mr_sdev_configure - Device configure callback handler
  * @sdev: SCSI device reference
  * @lim: queue limits
  *
@@ -5050,7 +5081,7 @@ static void mpi3mr_target_destroy(struct scsi_target *starget)
  * Return: 0 on success and -ENXIO on failure.
  */
 
-static int mpi3mr_device_configure(struct scsi_device *sdev,
+static int mpi3mr_sdev_configure(struct scsi_device *sdev,
     struct queue_limits *lim)
 {
 	struct scsi_target *starget;
@@ -5088,7 +5119,7 @@ static int mpi3mr_device_configure(struct scsi_device *sdev,
 }
 #else
 /**
- * mpi3mr_slave_configure - Slave configure callback handler
+ * mpi3mr_sdev_configure - Device configure callback handler
  * @sdev: SCSI device reference
  *
  * Configure queue depth, max hardware sectors and virt boundary
@@ -5096,7 +5127,7 @@ static int mpi3mr_device_configure(struct scsi_device *sdev,
  *
  * Return: 0 on success and -ENXIO on failure.
  */
-static int mpi3mr_slave_configure(struct scsi_device *sdev)
+static int mpi3mr_sdev_configure(struct scsi_device *sdev)
 {
 	struct scsi_target *starget;
 	struct Scsi_Host *shost;
@@ -5152,14 +5183,14 @@ static int mpi3mr_slave_configure(struct scsi_device *sdev)
 #endif
 
 /**
- * mpi3mr_slave_alloc -Slave alloc callback handler
+ * mpi3mr_sdev_init - Device alloc-init callback handler
  * @sdev: SCSI device reference
  *
  * Allocate per device(lun) private data and initialize it.
  *
  * Return: 0 on success -ENOMEM on memory allocation failure.
  */
-static int mpi3mr_slave_alloc(struct scsi_device *sdev)
+static int mpi3mr_sdev_init(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost;
 	struct mpi3mr_ioc *mrioc;
@@ -5238,7 +5269,7 @@ static int mpi3mr_target_alloc(struct scsi_target *starget)
 	spin_lock_irqsave(&mrioc->tgtdev_lock, flags);
 	if (starget->channel == mrioc->scsi_device_channel) {
 		tgt_dev = __mpi3mr_get_tgtdev_by_perst_id(mrioc, starget->id);
-		if (tgt_dev && !tgt_dev->is_hidden) {
+		if (tgt_dev && !tgt_dev->is_hidden && tgt_dev->non_stl) {
 			scsi_tgt_priv_data->starget = starget;
 			scsi_tgt_priv_data->dev_handle = tgt_dev->dev_handle;
 			scsi_tgt_priv_data->perst_id = tgt_dev->perst_id;
@@ -5674,14 +5705,29 @@ static struct scsi_host_template mpi3mr_driver_template = {
 	.proc_name			= MPI3MR_DRIVER_NAME,
 	.queuecommand			= mpi3mr_qcmd,
 	.target_alloc			= mpi3mr_target_alloc,
-	.slave_alloc			= mpi3mr_slave_alloc,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0))
-	.device_configure		= mpi3mr_device_configure,
-#else
-	.slave_configure		= mpi3mr_slave_configure,
-#endif
 	.target_destroy			= mpi3mr_target_destroy,
-	.slave_destroy			= mpi3mr_slave_destroy,
+#if (defined(CONFIG_SUSE_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6,12,0))) || \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(6,14,0)) || \
+	(defined(RHEL_MAJOR) && (RHEL_MAJOR == 10) && (RHEL_MINOR >= 1))
+	.sdev_init		= mpi3mr_sdev_init,
+	.sdev_configure		= mpi3mr_sdev_configure,
+	.sdev_destroy		= mpi3mr_sdev_destroy,
+
+#else
+	.slave_alloc     		= mpi3mr_sdev_init,
+
+#if (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9)) || \
+    (defined(RHEL_MAJOR) && !(RHEL_MAJOR == 10)) || \
+    (defined(CONFIG_SUSE_KERNEL) && \
+    (CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 1)) || \
+    (!(defined(RHEL_MAJOR)) && (!defined(CONFIG_SUSE_KERNEL)) && \
+    (LINUX_VERSION_CODE < (KERNEL_VERSION(6,10,0))))
+        .slave_configure                = mpi3mr_sdev_configure,
+#else
+        .device_configure               = mpi3mr_sdev_configure,
+#endif
+        .slave_destroy                  = mpi3mr_sdev_destroy,
+#endif
 	.scan_finished			= mpi3mr_scan_finished,
 	.scan_start			= mpi3mr_scan_start,
 	.change_queue_depth		= mpi3mr_change_queue_depth,
@@ -6096,6 +6142,7 @@ static void mpi3mr_remove(struct pci_dev *pdev)
 
 	if (mpi3mr_get_shost_and_mrioc(pdev, &shost, &mrioc))
 		return;
+
 	while (mrioc->reset_in_progress || mrioc->is_driver_loading)
 		ssleep(1);
 	if (mrioc->block_on_pcie_err) {
@@ -6124,7 +6171,8 @@ static void mpi3mr_remove(struct pci_dev *pdev)
 
 	if (mrioc->sas_transport_enabled)
 		sas_remove_host(shost);
-	scsi_remove_host(shost);
+	else
+		scsi_remove_host(shost);
 
 	list_for_each_entry_safe(tgtdev, tgtdev_next, &mrioc->tgtdev_list,
 	    list) {
@@ -6182,10 +6230,14 @@ static void mpi3mr_shutdown(struct pci_dev *pdev)
 	if (wq)
 		destroy_workqueue(wq);
 
+	if (mrioc->sas_transport_enabled)
+		sas_remove_host(shost);
+	else
+		scsi_remove_host(shost);
+
 	mpi3mr_stop_watchdog(mrioc);
 	mpi3mr_cleanup_ioc(mrioc);
 	mpi3mr_cleanup_resources(mrioc);
-
 }
 
 /**
