@@ -1,2 +1,3 @@
 .vscode/
 test_builds_out/
+test_builds_out.log
