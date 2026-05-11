@@ -2,7 +2,7 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2025 Broadcom Inc.
+ * Copyright (C) 2017-2026 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
@@ -1406,6 +1406,31 @@ void mpi3mr_print_fault_info(struct mpi3mr_ioc *mrioc)
 }
 
 /**
+ * mpi3mr_save_fault_info - Save fault information
+ * @mrioc: Adapter instance reference
+ *
+ * Save the controller fault information if there is a
+ * controller fault.
+ *
+ * Return: Nothing.
+ */
+static void mpi3mr_save_fault_info(struct mpi3mr_ioc *mrioc)
+{
+	u32 ioc_status, i;
+
+	ioc_status = readl(&mrioc->sysif_regs->ioc_status);
+
+	if (ioc_status & MPI3_SYSIF_IOC_STATUS_FAULT) {
+		mrioc->saved_fault_code = readl(&mrioc->sysif_regs->fault) &
+		    MPI3_SYSIF_FAULT_CODE_MASK;
+		for (i = 0; i < 3; i++) {
+			mrioc->saved_fault_info[i] =
+			readl(&mrioc->sysif_regs->fault_info[i]);
+		}
+	}
+}
+
+/**
  * mpi3mr_get_iocstate - Get IOC State
  * @mrioc: Adapter instance reference
  *
@@ -1670,6 +1695,59 @@ out:
 	    drv_buff_header->logical_buffer_end);
 
 	return pos_mini_dump;
+}
+
+/**
+ * mpi3mr_fault_uevent_emit - Emit uevent for any controller
+ * fault
+ * @mrioc: Pointer to the mpi3mr_ioc structure for the controller instance
+ *
+ * This function is invoked when the controller undergoes any
+ * type of fault.
+ */
+ static void mpi3mr_fault_uevent_emit(struct mpi3mr_ioc *mrioc)
+{
+	struct kobj_uevent_env *env;
+	int ret;
+
+	env = kzalloc(sizeof(*env), GFP_KERNEL);
+	if (!env)
+		return;
+
+	ret = add_uevent_var(env, "DRIVER=%s", mrioc->driver_name);
+	if (ret)
+		goto out_free;
+
+	ret = add_uevent_var(env, "IOC_ID=%u", mrioc->id);
+	if (ret)
+		goto out_free;
+
+	ret = add_uevent_var(env, "FAULT_CODE=0x%08x",
+			    mrioc->saved_fault_code);
+	if (ret)
+		goto out_free;
+
+	ret = add_uevent_var(env, "FAULT_INFO0=0x%08x",
+			     mrioc->saved_fault_info[0]);
+	if (ret)
+		goto out_free;
+
+	ret = add_uevent_var(env, "FAULT_INFO1=0x%08x",
+			    mrioc->saved_fault_info[1]);
+	if (ret)
+		goto out_free;
+
+	ret = add_uevent_var(env, "FAULT_INFO2=0x%08x",
+			    mrioc->saved_fault_info[2]);
+	if (ret)
+		goto out_free;
+
+	kobject_uevent_env(&mrioc->shost->shost_gendev.kobj,
+			KOBJ_CHANGE, env->envp);
+
+out_free:
+	kfree(env);
+
 }
 
 /**
@@ -2188,6 +2266,9 @@ void mpi3mr_check_rh_fault_ioc(struct mpi3mr_ioc *mrioc, u32 reason_code)
 		mpi3mr_set_trigger_data_in_all_hdb(mrioc,
 		    MPI3MR_HDB_TRIGGER_TYPE_FAULT, &trigger_data, 0);
 		mpi3mr_print_fault_info(mrioc);
+		mpi3mr_save_fault_info(mrioc);
+		mrioc->fault_during_init = 1;
+		mrioc->fwfault_counter++;
 		return;
 	}
 	mpi3mr_issue_reset(mrioc, MPI3_SYSIF_HOST_DIAG_RESET_ACTION_DIAG_FAULT,
@@ -2204,6 +2285,10 @@ void mpi3mr_check_rh_fault_ioc(struct mpi3mr_ioc *mrioc, u32 reason_code)
 			break;
 		msleep(100);
 	} while (--timeout);
+
+	mpi3mr_save_fault_info(mrioc);
+	mrioc->fault_during_init = 1;
+	mrioc->fwfault_counter++;
 }
 
 /**
@@ -2489,6 +2574,10 @@ static void mpi3mr_watchdog_work(struct work_struct *work)
 	union mpi3mr_trigger_data trigger_data;
 	u32 ds_timeout = MPI3_SYSIF_DIAG_SAVE_TIMEOUT;
 
+	if (mrioc->fault_during_init) {
+		mpi3mr_fault_uevent_emit(mrioc);
+		mrioc->fault_during_init = 0;
+	}
 
 	if (mrioc->reset_in_progress || mrioc->pcie_err_recovery)
 		return;
@@ -2571,6 +2660,10 @@ static void mpi3mr_watchdog_work(struct work_struct *work)
 		mrioc->unrecoverable = 1;
 		goto schedule_work;
 	}
+
+	mpi3mr_save_fault_info(mrioc);
+	mpi3mr_fault_uevent_emit(mrioc);
+	mrioc->fwfault_counter++;
 
 	switch (trigger_data.fault) {
 	case MPI3_SYSIF_FAULT_CODE_SOFT_RESET_IN_PROGRESS:
@@ -4868,6 +4961,9 @@ retry_bring_ioc_ready:
 		if (ioc_state == MRIOC_STATE_FAULT) {
 			timeout = MPI3_SYSIF_DIAG_SAVE_TIMEOUT * 10;
 			mpi3mr_print_fault_info(mrioc);
+			mpi3mr_save_fault_info(mrioc);
+			mrioc->fault_during_init = 1;
+			mrioc->fwfault_counter++;
 
 			do {
 				host_diagnostic =
@@ -5792,6 +5888,7 @@ static void mpi3mr_issue_ioc_shutdown(struct mpi3mr_ioc *mrioc)
 		ioc_warn(mrioc, "shutdown already in progress\n");
 		return;
 	}
+
 	shutdown_action = MPI3_SYSIF_IOC_CONFIG_SHUTDOWN_NORMAL |
 	    MPI3_SYSIF_IOC_CONFIG_DEVICE_SHUTDOWN_SEND_REQ;
 	ioc_config = readl(&mrioc->sysif_regs->ioc_configuration);
@@ -6367,6 +6464,10 @@ int mpi3mr_soft_reset_handler(struct mpi3mr_ioc *mrioc,
 					break;
 				msleep(100);
 			} while (--timeout);
+
+			mpi3mr_save_fault_info(mrioc);
+			mpi3mr_fault_uevent_emit(mrioc);
+			mrioc->fwfault_counter++;
 			mpi3mr_set_trigger_data_in_all_hdb(mrioc,
 			    MPI3MR_HDB_TRIGGER_TYPE_FAULT, &trigger_data, 0);
 		}

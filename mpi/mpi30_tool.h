@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 /*
- *  Copyright 2016-2025 Broadcom Inc. All rights reserved.
+ *  Copyright 2016-2026 Broadcom Inc. All rights reserved.
  */
 #ifndef MPI30_TOOL_H
 #define MPI30_TOOL_H     1
@@ -45,12 +45,14 @@ struct mpi3_tool_istwi_read_write_request {
 	union mpi3_sge_union                    sgl;
 };
 #define MPI3_TOOLBOX_ISTWI_FLAGS_AUTO_RESERVE_RELEASE       (0x80)
+#define MPI3_TOOLBOX_ISTWI_FLAGS_PAGE_ADDRESS_UPPER_MASK    (0x08)
+#define MPI3_TOOLBOX_ISTWI_FLAGS_PAGE_ADDRESS_UPPER_SHIFT   (3)
 #define MPI3_TOOLBOX_ISTWI_FLAGS_ADDRESS_MODE_MASK          (0x04)
 #define MPI3_TOOLBOX_ISTWI_FLAGS_ADDRESS_MODE_SHIFT         (2)
 #define MPI3_TOOLBOX_ISTWI_FLAGS_ADDRESS_MODE_DEVINDEX      (0x00)
 #define MPI3_TOOLBOX_ISTWI_FLAGS_ADDRESS_MODE_DEVICE_FIELD  (0x04)
-#define MPI3_TOOLBOX_ISTWI_FLAGS_PAGE_ADDRESS_MASK          (0x03)
-#define MPI3_TOOLBOX_ISTWI_FLAGS_PAGE_ADDRESS_SHIFT         (0)
+#define MPI3_TOOLBOX_ISTWI_FLAGS_PAGE_ADDRESS_LOWER_MASK    (0x03)
+#define MPI3_TOOLBOX_ISTWI_FLAGS_PAGE_ADDRESS_LOWER_SHIFT   (0)
 #define MPI3_TOOLBOX_ISTWI_ACTION_RESERVE_BUS               (0x00)
 #define MPI3_TOOLBOX_ISTWI_ACTION_RELEASE_BUS               (0x01)
 #define MPI3_TOOLBOX_ISTWI_ACTION_RESET                     (0x02)
@@ -256,6 +258,7 @@ struct mpi3_diag_buffer_manage_request {
 #define MPI3_DIAG_BUFFER_ACTION_RELEASE                     (0x01)
 #define MPI3_DIAG_BUFFER_ACTION_PAUSE                       (0x02)
 #define MPI3_DIAG_BUFFER_ACTION_RESUME                      (0x03)
+#define MPI3_DIAG_BUFFER_ACTION_CLEAR                       (0x04)
 struct mpi3_diag_buffer_upload_request {
 	__le16                     host_tag;
 	u8                         ioc_use_only02;

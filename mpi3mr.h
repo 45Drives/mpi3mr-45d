@@ -2,7 +2,7 @@
 /*
  * Driver for Broadcom MPI3 Storage Controllers
  *
- * Copyright (C) 2017-2025 Broadcom Inc.
+ * Copyright (C) 2017-2026 Broadcom Inc.
  *  (mailto: mpi3mr-linuxdrv.pdl@broadcom.com)
  *
  */
@@ -16,7 +16,6 @@
 #include <linux/errno.h>
 #include <linux/blkdev.h>
 #include <linux/blk-mq.h>
-#include <linux/blk-mq-pci.h>
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <linux/delay.h>
@@ -38,6 +37,13 @@
 #include <asm/unaligned.h>
 #else
 #include <linux/unaligned.h>
+#endif
+
+#if (!defined(CONFIG_SUSE_KERNEL) || (CONFIG_SUSE_VERSION != 1)) && \
+	(LINUX_VERSION_CODE < KERNEL_VERSION(6,14,0)) && \
+	!(defined(RHEL_MAJOR) && (RHEL_MAJOR == 9) && (RHEL_MINOR >= 7)) && \
+	!(defined(RHEL_MAJOR) && (RHEL_MAJOR == 10) && (RHEL_MINOR >= 1))
+#include <linux/blk-mq-pci.h>
 #endif
 
 #include <linux/kmsg_dump.h>
@@ -74,8 +80,8 @@ extern spinlock_t mrioc_list_lock;
 extern struct list_head mrioc_list;
 extern atomic64_t event_counter;
 
-#define MPI3MR_DRIVER_VERSION	"8.15.1.0.0"
-#define MPI3MR_DRIVER_RELDATE	"17-October-2025"
+#define MPI3MR_DRIVER_VERSION	"8.17.1.0.0"
+#define MPI3MR_DRIVER_RELDATE	"07-April-2026"
 
 
 #define MPI3MR_DRIVER_NAME	"mpi3mr"
@@ -245,6 +251,18 @@ extern atomic64_t event_counter;
 /* IOCTL data transfer sge*/
 #define MPI3MR_NUM_IOCTL_SGE		256
 #define MPI3MR_IOCTL_SGE_SIZE		(8 * 1024)
+
+#if (defined(CONFIG_SUSE_KERNEL) && (LINUX_VERSION_CODE >= KERNEL_VERSION(6,12,0))) || \
+    (LINUX_VERSION_CODE >= KERNEL_VERSION(6,14,0))
+#define MPI3MR_USE_SDEV_API 1
+#elif (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9)) || \
+    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 8)) || \
+    (defined(CONFIG_SUSE_KERNEL)) || \
+    (!(defined(RHEL_MAJOR)) && (!defined(CONFIG_SUSE_KERNEL)) && (LINUX_VERSION_CODE < (KERNEL_VERSION(6,10,0))))
+#define MPI3MR_USE_SLAVE_API 1
+#else
+#define MPI3MR_USE_DEVICE_CONFIGURE 1
+#endif
 
 /* Driver diag buffer levels */
 enum mpi3mr_drv_db_level {
@@ -661,7 +679,8 @@ struct mpi3mr_enclosure_node {
  * @sas_address_parent: Sas address of parent expander or host
  * @dev_info: Device information bits
  * @phy_id: Phy identifier provided in device page 0
- * @phy_id: Attached phy identifier provided in device page 0
+ * @attached_phy_id: Attached phy identifier provided in device page 0
+ * @negotiated_link_rate: Negotiated link rate from device page 0
  * @sas_transport_attached: Is this device exposed to transport
  * @pend_sas_rphy_add: Flag to check device is in process of add
  * @hba_port: HBA port entry
@@ -673,6 +692,7 @@ struct tgt_dev_sas_sata {
 	u16 dev_info;
 	u8 phy_id;
 	u8 attached_phy_id;
+	u8 negotiated_link_rate;
 	u8 sas_transport_attached;
 	u8 pend_sas_rphy_add;
 	struct mpi3mr_hba_port *hba_port;
@@ -1438,6 +1458,10 @@ struct mpi3mr_ioc {
 
 	bool check_xprotect_nvme;
 	bool skip_uefi_snapdump;
+	u8 fault_during_init;
+	u32 saved_fault_code;
+	u32 saved_fault_info[3];
+	u64 fwfault_counter;
 
 	u8 *logdata_buf;
 	u16 logdata_buf_idx;
