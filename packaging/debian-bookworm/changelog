@@ -1,4 +1,4 @@
-mpi3mr-dkms (8.17.1.0.0-45d1bookworm) bookworm; urgency=medium
+mpi3mr-dkms (8.17.1.0.0+45d1bookworm) bookworm; urgency=medium
 
   * Update upstream driver to 8.17.1.0.0
 
