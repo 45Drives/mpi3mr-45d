@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.17.1.0.0-45d2-1focal) focal; urgency=medium
+
+  * fix: add debian-trixie packaging, fix source format to 1.0
+
+ -- Rachit Hans <rhans@45drives.com>  Thu, 09 Jul 2026 12:17:28 -0300
+
 mpi3mr-dkms (8.17.1.0.0-45d1focal) focal; urgency=medium
 
   * Update upstream driver to 8.17.1.0.0

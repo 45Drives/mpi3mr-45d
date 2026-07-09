@@ -1,137 +1,137 @@
-mpi3mr-dkms (8.17.1.0.0-45d2-1jammy) jammy; urgency=medium
+mpi3mr-dkms (8.17.1.0.0-45d2-1trixie) trixie; urgency=medium
 
   * fix: add debian-trixie packaging, fix source format to 1.0
 
  -- Rachit Hans <rhans@45drives.com>  Thu, 09 Jul 2026 12:17:28 -0300
 
-mpi3mr-dkms (8.17.1.0.0-45d1jammy) jammy; urgency=medium
+mpi3mr-dkms (8.17.1.0.0+45d1bookworm) bookworm; urgency=medium
 
   * Update upstream driver to 8.17.1.0.0
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Mon, 11 May 2026 09:14:44 -0300
 
-mpi3mr-dkms (8.15.1.0.0-45d1jammy) jammy; urgency=medium
+mpi3mr-dkms (8.15.1.0.0-45d1bookworm) bookworm; urgency=medium
 
   * Update upstream driver to 8.15.1.0.0
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 09 Dec 2025 14:09:39 -0400
 
-mpi3mr-dkms (8.13.1.0.0-45d6jammy) jammy; urgency=medium
+mpi3mr-dkms (8.13.1.0.0-45d6bookworm) bookworm; urgency=medium
 
   * Add proxmox-default-headers dependency for newer PVE
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Wed, 16 Jul 2025 13:11:26 -0300
 
-mpi3mr-dkms (8.13.1.0.0-45d5jammy) jammy; urgency=medium
+mpi3mr-dkms (8.13.1.0.0-45d5bookworm) bookworm; urgency=medium
 
   * Bump package version to fix pve-headers dependency
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Wed, 16 Jul 2025 12:49:28 -0300
 
-mpi3mr-dkms (8.13.1.0.0-45d4jammy) jammy; urgency=medium
+mpi3mr-dkms (8.13.1.0.0-45d4bookworm) bookworm; urgency=medium
 
   * Put pve-headers dep first
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 15 Jul 2025 15:14:34 -0300
 
-mpi3mr-dkms (8.13.1.0.0-45d3jammy) jammy; urgency=medium
+mpi3mr-dkms (8.13.1.0.0-45d3bookworm) bookworm; urgency=medium
 
   * Add pve-headers dependency for builds on PVE
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 15 Jul 2025 14:56:43 -0300
 
-mpi3mr-dkms (8.13.1.0.0-45d2jammy) jammy; urgency=medium
+mpi3mr-dkms (8.13.1.0.0-45d2bookworm) bookworm; urgency=medium
 
   * Update upstream driver to 8.13.1.0.0
   * Fix build in EL 9.6, build against 5.14.0-570 broke due to upstream kernel backport
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 17 Jun 2025 11:31:34 -0300
 
-mpi3mr-dkms (8.13.1.0.0-45d1jammy) jammy; urgency=medium
+mpi3mr-dkms (8.13.1.0.0-45d1bookworm) bookworm; urgency=medium
 
   * Update upstream driver to 8.13.1.0.0
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 03 Jun 2025 11:23:28 -0300
 
-mpi3mr-dkms (8.9.1.0.0-45d7jammy) jammy; urgency=medium
+mpi3mr-dkms (8.9.1.0.0-45d7bookworm) bookworm; urgency=medium
 
   * Ensure module overrides default on Debian
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Mon, 03 Mar 2025 13:09:07 -0400
 
-mpi3mr-dkms (8.9.1.0.0-45d6jammy) jammy; urgency=medium
+mpi3mr-dkms (8.9.1.0.0-45d6bookworm) bookworm; urgency=medium
 
   * Fix build for RHEL
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 15 Nov 2024 11:22:00 -0400
 
-mpi3mr-dkms (8.9.1.0.0-45d5jammy) jammy; urgency=medium
+mpi3mr-dkms (8.9.1.0.0-45d5bookworm) bookworm; urgency=medium
 
   * Add kernel dev dependencies for build
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Mon, 28 Oct 2024 08:54:44 -0300
 
-mpi3mr-dkms (8.9.1.0.0-45d4jammy) jammy; urgency=medium
+mpi3mr-dkms (8.9.1.0.0-45d4bookworm) bookworm; urgency=medium
 
   * Fix build in Rocky 9.4 again
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 18 Oct 2024 10:59:36 -0300
 
-mpi3mr-dkms (8.9.1.0.0-45d3jammy) jammy; urgency=medium
+mpi3mr-dkms (8.9.1.0.0-45d3bookworm) bookworm; urgency=medium
 
   * Fix build for rocky >= 9.4
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 18 Oct 2024 10:21:50 -0300
 
-mpi3mr-dkms (8.9.1.0.0-45d2jammy) jammy; urgency=medium
+mpi3mr-dkms (8.9.1.0.0-45d2bookworm) bookworm; urgency=medium
 
   * Update compat for kernel >= 6.6
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 18 Oct 2024 09:54:19 -0300
 
-mpi3mr-dkms (8.9.1.0.0-45d1jammy) jammy; urgency=medium
+mpi3mr-dkms (8.9.1.0.0-45d1bookworm) bookworm; urgency=medium
 
   * Update upstream driver to 8.9.1.0.0
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 05 Jul 2024 13:49:43 -0300
 
-mpi3mr-dkms (8.7.1.0.0-45d4jammy) jammy; urgency=medium
+mpi3mr-dkms (8.7.1.0.0-45d4bookworm) bookworm; urgency=medium
 
   * Fix dkms build for rocky
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 05 Jan 2024 10:59:49 -0400
 
-mpi3mr-dkms (8.7.1.0.0-45d3jammy) jammy; urgency=medium
+mpi3mr-dkms (8.7.1.0.0-45d3bookworm) bookworm; urgency=medium
 
   * fix generated patch
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Thu, 07 Dec 2023 12:07:50 -0400
 
-mpi3mr-dkms (8.7.1.0.0-45d2jammy) jammy; urgency=medium
+mpi3mr-dkms (8.7.1.0.0-45d2bookworm) bookworm; urgency=medium
 
   * Update dkms.conf to have proper version
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Thu, 07 Dec 2023 11:49:03 -0400
 
-mpi3mr-dkms (8.7.1.0.0-45d1jammy) jammy; urgency=medium
+mpi3mr-dkms (8.7.1.0.0-45d1bookworm) bookworm; urgency=medium
 
   * update to 8.7.1
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Thu, 07 Dec 2023 11:38:18 -0400
 
-mpi3mr-dkms (8.6.1.0.0-45d1jammy) jammy; urgency=medium
+mpi3mr-dkms (8.6.1.0.0-45d1bookworm) bookworm; urgency=medium
 
   * Updated upstream to 8.6.1.0.0
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 18 Aug 2023 14:05:07 -0300
 
-mpi3mr-dkms (8.5.1.0.0-45d2jammy) jammy; urgency=medium
+mpi3mr-dkms (8.5.1.0.0-45d2bookworm) bookworm; urgency=medium
 
   * fixed installed path for rocky
 
  -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 15 Aug 2023 07:16:36 -0300
 
-mpi3mr-dkms (8.5.1.0.0-45d1jammy) jammy; urgency=medium
+mpi3mr-dkms (8.5.1.0.0-45d1bookworm) bookworm; urgency=medium
 
   * First build
 

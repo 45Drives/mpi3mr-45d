@@ -3,8 +3,8 @@
     "name": "mpi3mr-dkms",
     "title": "mpi3mr",
     "description": "Patched version of mpi3mr driver",
-    "version": "8.17.1.0.0",
-    "build_number": "45d1",
+    "version": "8.17.1.0.0-45d2",
+    "build_number": "1",
     "stable": true,
     "author": "Joshua Boudreau <jboudreau@45drives.com>",
     "git_url": "https://github.com/45Drives/mpi3mr-45d",
@@ -59,6 +59,11 @@
             "group": "debian",
             "os_name": "debian-bookworm",
             "image": "ci.cr.45d.io/ci/simple/debian-bookworm:1"
+        },
+        {
+            "group": "debian",
+            "os_name": "debian-trixie",
+            "image": "ci.cr.45d.io/ci/simple/debian-trixie:1"
         }
     ],
     "repos": [
@@ -67,8 +72,8 @@
     ],
     "changelog": {
         "urgency": "medium",
-        "version": "8.17.1.0.0",
-        "build_number": "45d1",
+        "version": "8.17.1.0.0-45d2",
+        "build_number": "1",
         "date": null,
         "packager": "Joshua Boudreau <jboudreau@45drives.com>",
         "changes": []
