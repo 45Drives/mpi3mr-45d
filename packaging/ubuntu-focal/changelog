@@ -1,5 +1,11 @@
 mpi3mr-dkms (8.17.1.0.0-45d2focal) focal; urgency=medium
 
+  * fix: update dkms.conf version to 45d2
+
+ -- Rachit Hans <rhans@45drives.com>  Thu, 09 Jul 2026 12:37:39 -0300
+
+mpi3mr-dkms (8.17.1.0.0-45d2focal) focal; urgency=medium
+
   * fix: correct version format, add debian-trixie packaging
 
  -- Rachit Hans <rhans@45drives.com>  Thu, 09 Jul 2026 12:28:07 -0300
