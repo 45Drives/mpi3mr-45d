@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.17.1.0.0-45d2trixie) trixie; urgency=medium
+
+  * fix: correct version format, add debian-trixie packaging
+
+ -- Rachit Hans <rhans@45drives.com>  Thu, 09 Jul 2026 12:28:07 -0300
+
 mpi3mr-dkms (8.17.1.0.0-45d2-1trixie) trixie; urgency=medium
 
   * fix: add debian-trixie packaging, fix source format to 1.0
