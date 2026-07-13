@@ -173,3 +173,21 @@ static inline int pci_disable_pcie_error_reporting(struct pci_dev *dev)
 #else
 #define MPI3MR_MAX_PAGE_ORDER 10
 #endif
+
+/* Kernel 6.13+ changed bios_param to take struct gendisk * instead of
+ * struct block_device *
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+#define MPI3MR_BIOS_PARAM_DISK_TYPE struct gendisk
+#else
+#define MPI3MR_BIOS_PARAM_DISK_TYPE struct block_device
+#endif
+
+/* Kernel 6.13+ changed queuecommand return type from int to
+ * enum scsi_qc_status
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+#define MPI3MR_QCMD_RET_TYPE enum scsi_qc_status
+#else
+#define MPI3MR_QCMD_RET_TYPE int
+#endif
