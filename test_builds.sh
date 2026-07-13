@@ -69,7 +69,7 @@ for image in "${IMAGES[@]}"; do
     OS_NAME=${image#mpi3mr-builder-}
     mkdir -p "$SCRIPT_DIR/test_builds_out/$OS_NAME"
     echo "$OS_NAME: {"
-    if docker run --rm --volume "$SCRIPT_DIR":/src:ro --volume "$SCRIPT_DIR/test_builds_out/$OS_NAME:/out" "$image" | sed 's/^/  /'; then
+    if docker run --rm --volume "$SCRIPT_DIR":/src:ro,z --volume "$SCRIPT_DIR/test_builds_out/$OS_NAME:/out" "$image" | sed 's/^/  /'; then
         echo "} PASSED"
     else
         RESULT=$?
