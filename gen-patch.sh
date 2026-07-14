@@ -2,15 +2,17 @@
 
 set -Eeuo pipefail
 
+PATCHED_BRANCH=${1:-patched}
+
 mkdir -p patches
 
 echo Generating patch...
 
-git diff upstream patched -p | tee patches/45drives.patch
+git diff upstream "$PATCHED_BRANCH" -p | tee patches/45drives.patch
 
 echo Updating dkms.conf...
 
-DRIVER_VERSION=$(awk '/^#define MPI3MR_DRIVER_VERSION/{ print $3 }' <(git show patched:mpi3mr.h))
+DRIVER_VERSION=$(awk '/^#define MPI3MR_DRIVER_VERSION/{ print $3 }' <(git show "$PATCHED_BRANCH":mpi3mr.h))
 if [ -z "$DRIVER_VERSION" ]; then
   echo "Failed to extract driver version from mpi3mr.h" >&2
   exit 1
