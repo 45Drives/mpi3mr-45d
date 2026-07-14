@@ -24,22 +24,26 @@ cp -apf /src/* /build
 RESULT=0
 
 test_build() {
+    LOG_SUBDIR=${1:-}
+    if [ -n "$LOG_SUBDIR" ]; then
+        mkdir -p "/out/$LOG_SUBDIR"
+    fi
     for KERNEL in "${kernels[@]}"; do
         KERNEL="$(realpath "$KERNEL")"
         KERNEL_NAME="$(basename "$KERNEL")"
         printf '%s: ' "$KERNEL_NAME"
-        if make -j"$(nproc)" CONFIG_DEBUG_INFO=1 CONFIG_DEBUG_INFO_BTF_MODULES= -C "$KERNEL" M=/build > "/out/$KERNEL_NAME.log" 2>&1; then
+        if make -j"$(nproc)" CONFIG_DEBUG_INFO=1 CONFIG_DEBUG_INFO_BTF_MODULES= -C "$KERNEL" M=/build > "/out/$LOG_SUBDIR/$KERNEL_NAME.log" 2>&1; then
             echo PASSED
         else
             RESULT=$?
-            echo "FAILED (see '$KERNEL_NAME.log')"
+            echo "FAILED (see '$LOG_SUBDIR/$KERNEL_NAME.log')"
         fi
     done
     return $RESULT
 }
 
 echo "unpatched {"
-if test_build | sed 's/^/  /'; then
+if test_build "unpatched" | sed 's/^/  /'; then
     echo "} PASSED"
 else
     echo "} FAILED"
@@ -47,7 +51,7 @@ fi
 
 patch -p1 -d /build < /src/patches/* >/dev/null 2>&1
 echo "patched {"
-if test_build | sed 's/^/  /'; then
+if test_build "patched" | sed 's/^/  /'; then
     echo "} PASSED"
 else
     RESULT=$?
