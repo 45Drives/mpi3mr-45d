@@ -1,3 +1,10 @@
+mpi3mr-dkms (8.17.1.0.0-45d3jammy) jammy; urgency=medium
+
+  * Fixes the mpi3mr driver build failure on Proxmox VE 9 (Trixie) with kernel 7.0.14-4-pve
+    (based on Linux 6.13+).
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Tue, 14 Jul 2026 07:12:56 -0300
+
 mpi3mr-dkms (8.17.1.0.0-45d2jammy) jammy; urgency=medium
 
   * fix: update dkms.conf version to 45d2
