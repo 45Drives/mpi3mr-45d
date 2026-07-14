@@ -4413,7 +4413,7 @@ out:
  * Return: 0 always
  */
 static int mpi3mr_bios_param(struct scsi_device *sdev,
-	struct block_device *bdev, sector_t capacity, int params[])
+	MPI3MR_BIOS_PARAM_DISK_TYPE *bdev, sector_t capacity, int params[])
 {
 	int heads;
 	int sectors;
@@ -5449,7 +5449,7 @@ inline bool mpi3mr_allow_scmd_to_fw(struct scsi_cmnd *scmd)
  *         SCSI_MLQUEUE_DEVICE_BUSY when the device is busy.
  *         SCSI_MLQUEUE_HOST_BUSY when the host queue is full.
  */
-static int mpi3mr_qcmd(struct Scsi_Host *shost,
+static MPI3MR_QCMD_RET_TYPE mpi3mr_qcmd(struct Scsi_Host *shost,
 	struct scsi_cmnd *scmd)
 {
 	struct mpi3mr_ioc *mrioc = shost_priv(shost);
