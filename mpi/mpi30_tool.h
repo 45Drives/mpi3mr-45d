@@ -169,7 +169,7 @@ struct mpi3_tool_recover_device_reply {
 	__le32                     ioc_log_info;
 	u8                         status;
 	u8                         reserved11;
-	__le16                     reserved1c;
+	__le16                     reserved12;
 };
 #define MPI3_TOOLBOX_RD_STATUS_NOT_NEEDED                   (0x01)
 #define MPI3_TOOLBOX_RD_STATUS_NEEDED                       (0x02)

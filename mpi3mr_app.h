@@ -12,6 +12,14 @@
 
 #include <linux/bsg-lib.h>
 
+#ifndef __DECLARE_FLEX_ARRAY
+#define __DECLARE_FLEX_ARRAY(TYPE, NAME)	\
+	struct { \
+		struct { } __empty_ ## NAME; \
+		TYPE NAME[]; \
+	}
+#endif
+
 /* Definitions for BSG commands */
 #define MPI3MR_DEV_NAME				"mpi3mrctl"
 
@@ -205,7 +213,7 @@ struct mpi3mr_all_tgt_info {
 	uint16_t num_devices; //The number of devices in driver's inventory
 	uint16_t rsvd1;
 	uint32_t rsvd2;
-	struct mpi3mr_device_map_info dmi[1]; //Variable length Array
+	struct mpi3mr_device_map_info dmi[];
 };
 
 /**
@@ -248,7 +256,7 @@ struct mpi3mr_logdata_entry {
 	uint8_t valid_entry;
 	uint8_t rsvd1;
 	uint16_t rsvd2;
-	uint8_t data[1]; //Variable length Array
+	uint8_t data[];
 };
 
 /**
@@ -259,7 +267,7 @@ struct mpi3mr_logdata_entry {
  * @entry: Log data entry
  */
 struct mpi3mr_bsg_in_log_data {
-	struct mpi3mr_logdata_entry entry[1]; //Variable length Array
+	__DECLARE_FLEX_ARRAY(struct mpi3mr_logdata_entry, entry);
 };
 
 /**
@@ -302,7 +310,7 @@ struct mpi3mr_bsg_in_hdb_status {
 	uint8_t element_trigger_format;
 	uint16_t rsvd1;
 	uint32_t rsvd2;
-	struct mpi3mr_hdb_entry entry[1]; //Variable length Array
+	struct mpi3mr_hdb_entry entry[];
 };
 
 /**
@@ -411,7 +419,7 @@ struct mpi3mr_buf_entry_list {
 	uint8_t rsvd1;
 	uint16_t rsvd2;
 	uint32_t rsvd3;
-	struct mpi3mr_buf_entry buf_entry[1];
+	struct mpi3mr_buf_entry buf_entry[];
 };
 /**
  * struct mpi3mr_bsg_mptcmd -  Generic bsg data

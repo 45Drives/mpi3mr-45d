@@ -230,7 +230,8 @@ void *mpi3mr_get_reply_virt_addr(struct mpi3mr_ioc *mrioc,
 		return NULL;
 
 	if ((phys_addr < mrioc->reply_buf_dma) ||
-	    (phys_addr > mrioc->reply_buf_dma_max_address))
+	    (phys_addr + mrioc->reply_sz > mrioc->reply_buf_dma_max_address) ||
+	    ((phys_addr - mrioc->reply_buf_dma) % mrioc->reply_sz))
 		return NULL;
 
 	return mrioc->reply_buf + (phys_addr - mrioc->reply_buf_dma);
@@ -249,6 +250,12 @@ void *mpi3mr_get_sensebuf_virt_addr(struct mpi3mr_ioc *mrioc,
 	dma_addr_t phys_addr)
 {
 	if (!phys_addr)
+		return NULL;
+
+	if ((phys_addr < mrioc->sense_buf_dma) ||
+	    (phys_addr > mrioc->sense_buf_dma +
+	     (mrioc->num_sense_bufs * MPI3MR_SENSE_BUF_SZ) - MPI3MR_SENSE_BUF_SZ) ||
+	    ((phys_addr - mrioc->sense_buf_dma) % MPI3MR_SENSE_BUF_SZ))
 		return NULL;
 
 	return mrioc->sense_buf + (phys_addr - mrioc->sense_buf_dma);
@@ -591,7 +598,8 @@ static void mpi3mr_process_admin_reply_desc(struct mpi3mr_ioc *mrioc,
 			    le64_to_cpu(scsi_reply->sense_data_buffer_address));
 			sense_count = le32_to_cpu(scsi_reply->sense_count);
 			if (sense_buf) {
-				scsi_normalize_sense(sense_buf, sense_count,
+				scsi_normalize_sense(sense_buf,
+				    min_t(u32, sense_count, MPI3MR_SENSE_BUF_SZ),
 				    &sshdr);
 				mpi3mr_scsisense_trigger(mrioc, sshdr.sense_key,
 				    sshdr.asc, sshdr.ascq);
@@ -620,8 +628,10 @@ static void mpi3mr_process_admin_reply_desc(struct mpi3mr_ioc *mrioc,
 			cmdptr->state &= ~MPI3MR_CMD_PENDING;
 			if (def_reply) {
 				cmdptr->state |= MPI3MR_CMD_REPLY_VALID;
-				memcpy((u8 *)cmdptr->reply, (u8 *)def_reply,
-				    mrioc->reply_sz);
+				if (cmdptr->reply)
+					memcpy((u8 *)cmdptr->reply,
+					    (u8 *)def_reply,
+					    mrioc->reply_sz);
 			}
 			if (sense_buf && cmdptr->sensebuf) {
 				cmdptr->is_sense = 1;
@@ -1575,7 +1585,7 @@ static int mpi3mr_do_uefi_dump(struct mpi3mr_ioc *mrioc)
 	if (!mrioc->uefi_logs)
 		return pos_uefi_dump;
 
-	data_len = mrioc->uefi_logs_sz;
+	data_len = min_t(u32, mrioc->uefi_logs_sz, mrioc->drv_diag_buffer_sz);
 	memcpy(mrioc->drv_diag_buffer, mrioc->uefi_logs, data_len);
 	drv_buff_header =
 		(struct mpi3_driver_buffer_header *)mrioc->drv_diag_buffer;
@@ -1652,7 +1662,7 @@ static int mpi3mr_do_mini_dump(struct mpi3mr_ioc *mrioc, int prev_offset)
 	pos_mini_dump =
 	    prev_offset ? prev_offset : sizeof(struct mpi3_driver_buffer_header);
 
-	if ((pos_mini_dump + strlen(mini_start)
+	if ((pos_mini_dump + strlen(mini_start) + 1
 			    < mrioc->drv_diag_buffer_sz)) {
 		sprintf((char *)mrioc->drv_diag_buffer + pos_mini_dump,
 			"%s\n", mini_start);
@@ -1674,7 +1684,7 @@ static int mpi3mr_do_mini_dump(struct mpi3mr_ioc *mrioc, int prev_offset)
 		}
 	}
 
-	if ((pos_mini_dump + strlen(mini_end)
+	if ((pos_mini_dump + strlen(mini_end) + 1
 			    < mrioc->drv_diag_buffer_sz)) {
 		sprintf((char *)mrioc->drv_diag_buffer + pos_mini_dump,
 			"%s\n", mini_end);
@@ -1933,6 +1943,10 @@ static int mpi3mr_issue_reset(struct mpi3mr_ioc *mrioc, u16 reset_type,
 		return retval;
 	if (mrioc->unrecoverable)
 		return retval;
+	if (mrioc->pcie_err_recovery) {
+		ioc_info(mrioc, "reset skipped due to pcie error recovery\n");
+		return retval;
+	}
 	if (reset_reason == MPI3MR_RESET_FROM_FIRMWARE) {
 		retval = 0;
 		return retval;
@@ -2401,7 +2415,10 @@ static int mpi3mr_print_pkg_ver(struct mpi3mr_ioc *mrioc)
 	mrioc->init_cmds.callback = NULL;
 	ci_upload.host_tag = cpu_to_le16(MPI3MR_HOSTTAG_INITCMDS);
 	ci_upload.function = MPI3_FUNCTION_CI_UPLOAD;
-	ci_upload.msg_flags = MPI3_CI_UPLOAD_MSGFLAGS_LOCATION_PRIMARY;
+	if (mrioc->facts.exceptions & MPI3_IOCFACTS_EXCEPT_BOOTSTAT_SECONDARY)
+		ci_upload.msg_flags = MPI3_CI_UPLOAD_MSGFLAGS_LOCATION_SECONDARY;
+	else
+		ci_upload.msg_flags = MPI3_CI_UPLOAD_MSGFLAGS_LOCATION_PRIMARY;
 	ci_upload.signature1 = MPI3_IMAGE_HEADER_SIGNATURE1_MANIFEST;
 	ci_upload.image_offset = MPI3_IMAGE_HEADER_SIZE;
 	ci_upload.segment_size = data_len;
@@ -2531,14 +2548,15 @@ mpi3mr_upload_drv_diag_buffer(struct mpi3mr_ioc *mrioc)
 	} else {
 		diag_upload_reply = (struct mpi3_diag_buffer_upload_reply *)
 			mrioc->init_cmds.reply;
-		mrioc->uefi_logs_sz =
-			le32_to_cpu(diag_upload_reply->returned_data_length);
+		mrioc->uefi_logs_sz = min_t(u32,
+		    le32_to_cpu(diag_upload_reply->returned_data_length),
+		    data_len);
 		if (mrioc->uefi_logs_sz) {
 			mrioc->uefi_logs = vzalloc(mrioc->uefi_logs_sz);
 			if (!mrioc->uefi_logs)
 				mrioc->uefi_logs_sz = 0;
 			else
-				memcpy(mrioc->uefi_logs, data, data_len);
+				memcpy(mrioc->uefi_logs, data, mrioc->uefi_logs_sz);
 		}
 		ioc_info(mrioc,
 		    "driver diag buffer upload is success size drv/fw/final(%d/%d/%d)\n",
@@ -2558,8 +2576,10 @@ out_unlock:
  * @work: work struct
  *
  * Watch dog work periodically executed (1 second interval) to
- * monitor firmware fault and to issue periodic timer sync to
- * the firmware.
+ * monitor firmware fault and perform timestamp synchronization
+ * to firmware, with an early sync 1 minute after load followed
+ * by periodic updates at ts_update_interval seconds (default 15 minutes).
+ *
  *
  * Return: Nothing.
  */
@@ -2604,13 +2624,25 @@ static void mpi3mr_watchdog_work(struct work_struct *work)
 	}
 
 	if (!(mrioc->facts.ioc_capabilities &
-		MPI3_IOCFACTS_CAPABILITY_NON_SUPERVISOR_IOC) &&
-		(mrioc->ts_update_counter++ >= mrioc->ts_update_interval)) {
-		/* No need to capture uefi snapdump
-		 * after certain time elapsed. */
-		mrioc->skip_uefi_snapdump = true;
-		mrioc->ts_update_counter = 0;
-		mpi3mr_sync_timestamp(mrioc);
+		MPI3_IOCFACTS_CAPABILITY_NON_SUPERVISOR_IOC)) {
+		if (!mrioc->early_ts_sync_done) {
+			/*
+			 * Send time sync 1 min after load/reset.
+			 */
+			if (mrioc->ts_update_counter++ >=
+					MPI3MR_EARLY_TSUPDATE_SECONDS) {
+				mrioc->early_ts_sync_done = 1;
+				mrioc->ts_update_counter = 0;
+				mpi3mr_sync_timestamp(mrioc);
+			}
+		} else if (mrioc->ts_update_counter++ >=
+				mrioc->ts_update_interval) {
+			/* No need to capture uefi snapdump
+			 * after certain time elapsed. */
+			mrioc->skip_uefi_snapdump = true;
+			mrioc->ts_update_counter = 0;
+			mpi3mr_sync_timestamp(mrioc);
+		}
 	}
 
 	if ((mrioc->prepare_for_reset) &&
@@ -2932,6 +2964,13 @@ static int mpi3mr_alloc_op_reply_q_segments(struct mpi3mr_ioc *mrioc, u16 qidx)
 	struct segments *segments;
 
 	if (mrioc->is_segqueue_enabled) {
+		if (!mrioc->op_reply_desc_sz ||
+		    mrioc->op_reply_desc_sz > MPI3MR_OP_REP_Q_SEG_SIZE) {
+			ioc_err(mrioc,
+			    "invalid op_reply_desc_sz %u (max %u), cannot allocate reply queue segments\n",
+			    mrioc->op_reply_desc_sz, MPI3MR_OP_REP_Q_SEG_SIZE);
+			return -EINVAL;
+		}
 		op_reply_q->segment_qd =
 		    MPI3MR_OP_REP_Q_SEG_SIZE / mrioc->op_reply_desc_sz;
 
@@ -2990,6 +3029,13 @@ static int mpi3mr_alloc_op_req_q_segments(struct mpi3mr_ioc *mrioc, u16 qidx)
 	struct segments *segments;
 
 	if (mrioc->is_segqueue_enabled) {
+		if (!mrioc->facts.op_req_sz ||
+		    mrioc->facts.op_req_sz > MPI3MR_OP_REQ_Q_SEG_SIZE) {
+			ioc_err(mrioc,
+			    "invalid op_req_sz %u (max %u), cannot allocate request queue segments\n",
+			    mrioc->facts.op_req_sz, MPI3MR_OP_REQ_Q_SEG_SIZE);
+			return -EINVAL;
+		}
 		op_req_q->segment_qd =
 		    MPI3MR_OP_REQ_Q_SEG_SIZE / mrioc->facts.op_req_sz;
 
@@ -3365,12 +3411,15 @@ static int mpi3mr_create_op_queues(struct mpi3mr_ioc *mrioc)
 
 	return retval;
 out_failed:
+	for (i = 0; i < num_queues; i++) {
+		mpi3mr_free_op_req_q_segments(mrioc, i);
+		mpi3mr_free_op_reply_q_segments(mrioc, i);
+	}
 	kfree(mrioc->req_qinfo);
 	mrioc->req_qinfo = NULL;
 
 	kfree(mrioc->op_reply_qinfo);
 	mrioc->op_reply_qinfo = NULL;
-
 
 	return retval;
 }
@@ -3458,9 +3507,10 @@ out_failed:
  * Convert IOC facts data into cpu endianness and cache it in
  * the driver .
  *
- * Return: Nothing.
+ * Return: 0 on success, -EINVAL if the controller reported an
+ * operational request entry size the driver cannot work with.
  */
-static void mpi3mr_process_factsdata(struct mpi3mr_ioc *mrioc,
+static int mpi3mr_process_factsdata(struct mpi3mr_ioc *mrioc,
 	struct mpi3_ioc_facts_data *facts_data)
 {
 	u32 ioc_config, req_sz, facts_flags;
@@ -3480,6 +3530,14 @@ static void mpi3mr_process_factsdata(struct mpi3mr_ioc *mrioc,
 		    "ioc_facts request frame size mismatch hardware_size(%d), firmware_sz(%d)\n",
 		    req_sz / 4,
 		    le16_to_cpu(facts_data->ioc_request_frame_size));
+
+	/* each queue slot must hold the fixed size request frame */
+	if (req_sz < MPI3MR_ADMIN_REQ_FRAME_SZ) {
+		ioc_err(mrioc,
+		    "controller reported operational request entry size %u, minimum supported is %u\n",
+		    req_sz, MPI3MR_ADMIN_REQ_FRAME_SZ);
+		return -EINVAL;
+	}
 
 	memset(&mrioc->facts, 0, sizeof(mrioc->facts));
 
@@ -3505,6 +3563,15 @@ static void mpi3mr_process_factsdata(struct mpi3mr_ioc *mrioc,
 		le16_to_cpu(facts_data->max_outstanding_requests);
 	mrioc->facts.product_id = le16_to_cpu(facts_data->product_id);
 	mrioc->facts.reply_sz = le16_to_cpu(facts_data->reply_frame_size) * 4;
+	/* reply frame must hold the event reply header the handlers subtract */
+	if (mrioc->facts.reply_sz <
+	    offsetof(struct mpi3_event_notification_reply, event_data)) {
+		ioc_err(mrioc,
+		    "controller reported reply frame size %u, minimum supported is %zu\n",
+		    mrioc->facts.reply_sz,
+		    offsetof(struct mpi3_event_notification_reply, event_data));
+		return -EINVAL;
+	}
 	mrioc->facts.exceptions = le16_to_cpu(facts_data->ioc_exceptions);
 	mrioc->facts.max_perids = le16_to_cpu(facts_data->max_persistent_id);
 	mrioc->facts.max_vds = le16_to_cpu(facts_data->max_vds);
@@ -3604,6 +3671,7 @@ static void mpi3mr_process_factsdata(struct mpi3mr_ioc *mrioc,
 	    mrioc->facts.io_throttle_data_length * 4,
 	    mrioc->facts.io_throttle_high, mrioc->facts.io_throttle_low);
 
+	return 0;
 }
 
 /**
@@ -3677,7 +3745,7 @@ static int mpi3mr_issue_iocfacts(struct mpi3mr_ioc *mrioc,
 		goto out_unlock;
 	}
 	memcpy(facts_data, (u8 *)data, data_len);
-	mpi3mr_process_factsdata(mrioc, facts_data);
+	retval = mpi3mr_process_factsdata(mrioc, facts_data);
 out_unlock:
 	mrioc->init_cmds.state = MPI3MR_CMD_NOTUSED;
 	mutex_unlock(&mrioc->init_cmds.mutex);
@@ -4460,26 +4528,34 @@ static int mpi3mr_repost_diag_bufs(struct mpi3mr_ioc *mrioc)
 }
 
 /**
- * mpi3mr_read_tsu_interval - Update time stamp interval
+ * mpi3mr_read_driver_page1 - Read Driver Page 1 parameters
  * @mrioc: Adapter instance reference
  *
- * Update time stamp interval if its defined in driver page 1,
- * otherwise use default value.
+ * Reads and caches Driver Page 1 parameters such as
+ * timestamp update interval and driver behavior flags.
  *
  * Return: Nothing
  */
 static void
-mpi3mr_read_tsu_interval(struct mpi3mr_ioc *mrioc)
+mpi3mr_read_driver_page1(struct mpi3mr_ioc *mrioc)
 {
 	struct mpi3_driver_page1 driver_pg1;
 	u16 pg_sz = sizeof(driver_pg1);
 	int retval = 0;
 
 	mrioc->ts_update_interval = MPI3MR_TSUPDATE_INTERVAL;
+	mrioc->skip_dev_shutdown_on_unload = 0;
 
 	retval = mpi3mr_cfg_get_driver_pg1(mrioc, &driver_pg1, pg_sz);
-	if (!retval && driver_pg1.time_stamp_update)
+	if (retval)
+		return;
+
+	if (driver_pg1.time_stamp_update)
 		mrioc->ts_update_interval = (driver_pg1.time_stamp_update * 60);
+
+	mrioc->skip_dev_shutdown_on_unload =
+		(driver_pg1.flags &
+		 MPI3_DRIVER1_FLAGS_DEVICE_SHUTDOWN_ON_UNLOAD_DISABLE) ? 1 : 0;
 }
 
 /**
@@ -4810,6 +4886,13 @@ mpi3mr_revalidate_factsdata(struct mpi3mr_ioc *mrioc)
 		ioc_err(mrioc,
 		    "cannot increase reply size from %d to %d\n",
 		    mrioc->reply_sz, mrioc->facts.reply_sz);
+		return -EPERM;
+	}
+
+	if (mrioc->facts.op_req_sz != mrioc->op_req_sz) {
+		ioc_err(mrioc,
+		    "cannot change operational request entry size from %d to %d\n",
+		    mrioc->op_req_sz, mrioc->facts.op_req_sz);
 		return -EPERM;
 	}
 	if (mrioc->num_io_throttle_group != mrioc->facts.max_io_throttle_group)
@@ -5165,6 +5248,13 @@ retry_init:
 		goto out_failed;
 	}
 
+	if (mrioc->facts.max_reqs <= MPI3MR_INTERNALCMDS_RESVD) {
+		ioc_err(mrioc,
+		    "firmware max_outstanding_requests(%d) too small, need > %d\n",
+		    mrioc->facts.max_reqs, MPI3MR_INTERNALCMDS_RESVD);
+		retval = -1;
+		goto out_failed_noretry;
+	}
 	mrioc->max_host_ios = mrioc->facts.max_reqs - MPI3MR_INTERNALCMDS_RESVD;
 	mrioc->shost->max_sectors = mrioc->facts.max_data_length / 512;
 	if (!(mrioc->facts.ioc_capabilities &
@@ -5190,6 +5280,7 @@ retry_init:
 		    MPI3MR_HOST_IOS_KDUMP);
 
 	mrioc->reply_sz = mrioc->facts.reply_sz;
+	mrioc->op_req_sz = mrioc->facts.op_req_sz;
 
 	dprint_init(mrioc, "check and reset dma mask\n");
 	retval = mpi3mr_check_reset_dma_mask(mrioc);
@@ -5197,7 +5288,7 @@ retry_init:
 		ioc_err(mrioc, "resetting dma mask failed\n");
 		goto out_failed_noretry;
 	}
-	mpi3mr_read_tsu_interval(mrioc);
+	mpi3mr_read_driver_page1(mrioc);
 	mpi3mr_print_ioc_info(mrioc);
 
 	dprint_init(mrioc, "allocating host diag buffers\n");
@@ -5369,7 +5460,7 @@ retry_init:
 		ioc_err(mrioc, "failed to revalidate ioc_facts data\n");
 		goto out_failed_noretry;
 	}
-	mpi3mr_read_tsu_interval(mrioc);
+	mpi3mr_read_driver_page1(mrioc);
 	mpi3mr_print_ioc_info(mrioc);
 
 	if (is_resume) {
@@ -5853,6 +5944,7 @@ void mpi3mr_free_mem(struct mpi3mr_ioc *mrioc)
 	}
 
 	vfree(mrioc->uefi_logs);
+	mrioc->uefi_logs = NULL;
 	kfree(mrioc->logdata_buf);
 	mrioc->logdata_buf = NULL;
 	kfree(mrioc->driver_pg2);
@@ -5889,8 +5981,16 @@ static void mpi3mr_issue_ioc_shutdown(struct mpi3mr_ioc *mrioc)
 		return;
 	}
 
-	shutdown_action = MPI3_SYSIF_IOC_CONFIG_SHUTDOWN_NORMAL |
-	    MPI3_SYSIF_IOC_CONFIG_DEVICE_SHUTDOWN_SEND_REQ;
+	shutdown_action = MPI3_SYSIF_IOC_CONFIG_SHUTDOWN_NORMAL;
+
+	if (!(mrioc->is_unload && mrioc->skip_dev_shutdown_on_unload))
+		shutdown_action |=
+			MPI3_SYSIF_IOC_CONFIG_DEVICE_SHUTDOWN_SEND_REQ;
+	else
+		ioc_info(mrioc,
+		    "The shutdown request is issued without the device shutdown bit set "
+		    "as indicated by the controller configuration\n");
+
 	ioc_config = readl(&mrioc->sysif_regs->ioc_configuration);
 	ioc_config |= shutdown_action;
 

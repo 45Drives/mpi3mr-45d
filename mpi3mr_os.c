@@ -165,10 +165,18 @@ static void mpi3mr_fwevt_add_to_list(struct mpi3mr_ioc *mrioc,
 {
 	unsigned long flags;
 
-	if (!mrioc->fwevt_worker_thread)
-		return;
-
+	/*
+	 * Check fwevt_worker_thread under fwevt_lock to avoid a TOCTOU
+	 * race with the remove/shutdown paths, which NULL the field
+	 * (and then destroy the workqueue) while holding the same lock.
+	 * Without this, queue_work() could be invoked on a NULL or
+	 * just-destroyed workqueue.
+	 */
 	spin_lock_irqsave(&mrioc->fwevt_lock, flags);
+	if (!mrioc->fwevt_worker_thread) {
+		spin_unlock_irqrestore(&mrioc->fwevt_lock, flags);
+		return;
+	}
 	/* get fwevt reference count while adding it to fwevt_list */
 	mpi3mr_fwevt_get(fwevt);
 	INIT_LIST_HEAD(&fwevt->list);
@@ -318,6 +326,8 @@ void mpi3mr_cleanup_fwevt_list(struct mpi3mr_ioc *mrioc)
 		 */
 		if (current_work() == &fwevt->work || fwevt->pending_at_sml) {
 			fwevt->discard = 1;
+			/* Balance mpi3mr_fwevt_get() above; no cancel_work_sync here */
+			mpi3mr_fwevt_put(fwevt);
 			return;
 		}
 
@@ -1209,10 +1219,13 @@ void mpi3mr_refresh_tgtdevs(struct mpi3mr_ioc *mrioc)
 {
 	struct mpi3mr_tgt_dev *tgtdev, *tgtdev_next;
 	struct mpi3mr_stgt_priv_data *tgt_priv;
+	struct scsi_target *starget;
+	unsigned long flags;
 
 	dprint_reset(mrioc, "refresh target devices: check for removals\n");
 	list_for_each_entry_safe(tgtdev, tgtdev_next, &mrioc->tgtdev_list,
 	    list) {
+		spin_lock_irqsave(&mrioc->tgtdev_lock, flags);
 		if (((tgtdev->dev_handle == MPI3MR_INVALID_DEV_HANDLE) ||
 		     tgtdev->is_hidden) &&
 		    tgtdev->host_exposed && tgtdev->starget &&
@@ -1221,6 +1234,7 @@ void mpi3mr_refresh_tgtdevs(struct mpi3mr_ioc *mrioc)
 			tgt_priv->dev_removed = 1;
 			atomic_set(&tgt_priv->block_io, 0);
 		}
+		spin_unlock_irqrestore(&mrioc->tgtdev_lock, flags);
 	}
 	list_for_each_entry_safe(tgtdev, tgtdev_next, &mrioc->tgtdev_list,
 	    list) {
@@ -1243,13 +1257,22 @@ void mpi3mr_refresh_tgtdevs(struct mpi3mr_ioc *mrioc)
 	list_for_each_entry(tgtdev, &mrioc->tgtdev_list, list) {
 		if ((tgtdev->dev_handle != MPI3MR_INVALID_DEV_HANDLE) &&
 		    !tgtdev->is_hidden) {
-			if (!tgtdev->host_exposed)
+			if (!tgtdev->host_exposed) {
 				mpi3mr_report_tgtdev_to_host(mrioc,
 				    tgtdev->perst_id);
-			else if (tgtdev->starget)
-				starget_for_each_device(tgtdev->starget,
+				continue;
+			}
+			spin_lock_irqsave(&mrioc->tgtdev_lock, flags);
+			starget = tgtdev->starget;
+			if (starget)
+				get_device(&starget->dev);
+			spin_unlock_irqrestore(&mrioc->tgtdev_lock, flags);
+			if (starget) {
+				starget_for_each_device(starget,
 				    (void *) tgtdev, mpi3mr_update_sdev);
-	}
+				put_device(&starget->dev);
+			}
+		}
 	}
 	dprint_reset(mrioc, "refresh target devices: done\n");
 }
@@ -1472,10 +1495,27 @@ static void mpi3mr_update_tgtdev(struct mpi3mr_ioc *mrioc,
 		tgtdev->dev_spec.pcie_inf.capb =
 		    le32_to_cpu(pcieinf->capabilities);
 		tgtdev->dev_spec.pcie_inf.mdts = MPI3MR_DEFAULT_MDTS;
+		/*
+		 * Clamp firmware-supplied NVMe page-size exponent.
+		 * pcieinf->page_size is u8 (0-255); 1 << pgsz is performed
+		 * as a 32-bit int by downstream consumers and would be
+		 * undefined behavior for pgsz >= 32 (and implementation
+		 * defined for pgsz == 31). On some archs UB can yield 0,
+		 * which would later trigger divide-by-zero in
+		 * mpi3mr_build_nvme_prp's modulo check.
+		 */
+		if (pcieinf->page_size > MPI3MR_MAX_PGSZEXP) {
+			ioc_warn(mrioc,
+			    "device handle 0x%04x reports implausible page_size exponent %u; clamping to %u\n",
+			    le16_to_cpu(dev_pg0->dev_handle),
+			    pcieinf->page_size, MPI3MR_MAX_PGSZEXP);
+			tgtdev->dev_spec.pcie_inf.pgsz = MPI3MR_MAX_PGSZEXP;
+		} else {
+			tgtdev->dev_spec.pcie_inf.pgsz = pcieinf->page_size;
+		}
 		if (dev_pg0->access_status == MPI3_DEVICE0_ASTATUS_NO_ERRORS) {
 			tgtdev->dev_spec.pcie_inf.mdts =
 			    le32_to_cpu(pcieinf->maximum_data_transfer_size);
-			tgtdev->dev_spec.pcie_inf.pgsz = pcieinf->page_size;
 			tgtdev->dev_spec.pcie_inf.reset_to =
 				max_t(u8, pcieinf->controller_reset_to,
 				      MPI3MR_INTADMCMD_TIMEOUT);
@@ -1620,6 +1660,8 @@ static void mpi3mr_devinfochg_evt_bh(struct mpi3mr_ioc *mrioc,
 	struct mpi3_device_page0 *dev_pg0)
 {
 	struct mpi3mr_tgt_dev *tgtdev = NULL;
+	struct scsi_target *starget;
+	unsigned long flags;
 	u16 dev_handle = 0, perst_id = 0;
 
 	perst_id = le16_to_cpu(dev_pg0->persistent_id);
@@ -1641,9 +1683,18 @@ static void mpi3mr_devinfochg_evt_bh(struct mpi3mr_ioc *mrioc,
 		mpi3mr_report_tgtdev_to_host(mrioc, perst_id);
 	if (tgtdev->is_hidden && tgtdev->host_exposed)
 		mpi3mr_remove_tgtdev_from_host(mrioc, tgtdev);
-	if (!tgtdev->is_hidden && tgtdev->host_exposed && tgtdev->starget)
-		starget_for_each_device(tgtdev->starget, (void *) tgtdev,
-		    mpi3mr_update_sdev);
+	if (!tgtdev->is_hidden && tgtdev->host_exposed) {
+		spin_lock_irqsave(&mrioc->tgtdev_lock, flags);
+		starget = tgtdev->starget;
+		if (starget)
+			get_device(&starget->dev);
+		spin_unlock_irqrestore(&mrioc->tgtdev_lock, flags);
+		if (starget) {
+			starget_for_each_device(starget, (void *) tgtdev,
+			    mpi3mr_update_sdev);
+			put_device(&starget->dev);
+		}
+	}
 out:
 	if (tgtdev)
 		mpi3mr_tgtdev_put(tgtdev);
@@ -1756,6 +1807,9 @@ static void mpi3mr_encldev_add_chg_evt_bh(struct mpi3mr_ioc *mrioc,
 	struct mpi3_enclosure_page0 *encl_pg0;
 	u16 encl_handle;
 	u8 added, present;
+
+	if (fwevt->event_data_size < sizeof(*encl_pg0))
+		return;
 
 	encl_pg0= (struct mpi3_enclosure_page0 *) fwevt->event_data;
 	added = (fwevt->event_id == MPI3_EVENT_ENCL_DEVICE_ADDED) ? 1 : 0;
@@ -1898,6 +1952,16 @@ static void mpi3mr_sastopochg_evt_bh(struct mpi3mr_ioc *mrioc,
 	struct mpi3mr_sas_node *sas_expander = NULL;
 	unsigned long flags;
 	u8 link_rate, prev_link_rate, parent_phy_number;
+	u16 max_entries;
+
+	if (fwevt->event_data_size <
+	    offsetof(struct mpi3_event_data_sas_topology_change_list, phy_entry))
+		return;
+	max_entries = (fwevt->event_data_size -
+	    offsetof(struct mpi3_event_data_sas_topology_change_list, phy_entry)) /
+	    sizeof(struct mpi3_event_sas_topo_phy_entry);
+	if (event_data->num_entries > max_entries)
+		event_data->num_entries = max_entries;
 
 	mpi3mr_sastopochg_evt_debug(mrioc, event_data);
 	if (mrioc->sas_transport_enabled) {
@@ -2076,7 +2140,17 @@ static void mpi3mr_pcietopochg_evt_bh(struct mpi3mr_ioc *mrioc,
 	int i;
 	u16 handle;
 	u8 reason_code;
+	u16 max_entries;
 	struct mpi3mr_tgt_dev *tgtdev = NULL;
+
+	if (fwevt->event_data_size <
+	    offsetof(struct mpi3_event_data_pcie_topology_change_list, port_entry))
+		return;
+	max_entries = (fwevt->event_data_size -
+	    offsetof(struct mpi3_event_data_pcie_topology_change_list, port_entry)) /
+	    sizeof(struct mpi3_event_pcie_topo_port_entry);
+	if (event_data->num_entries > max_entries)
+		event_data->num_entries = max_entries;
 
 	mpi3mr_pcietopochg_evt_debug(mrioc, event_data);
 
@@ -2182,6 +2256,11 @@ static void mpi3mr_fwevt_bh(struct mpi3mr_ioc *mrioc,
 
 	if (mrioc->stop_drv_processing) {
 		dprint_event_bh(mrioc, "ignoring event(0x%02x) in the bottom half handler due to stop_drv_processing\n",
+		    fwevt->event_id);
+		goto out;
+	}
+	if (mrioc->pcie_err_recovery) {
+		dprint_event_bh(mrioc, "ignoring event(0x%02x) in the bottom half handler due to pcie error recovery\n",
 		    fwevt->event_id);
 		goto out;
 	}
@@ -2441,7 +2520,8 @@ static void mpi3mr_dev_rmhs_complete_iou(struct mpi3mr_ioc *mrioc,
 		ioc_info(mrioc,
 		    "dev_remove_hs: cmd_idx(%d): completed successfully for handle(0x%04x), rc(%d)\n",
 		    cmd_idx,  drv_cmd->dev_handle, drv_cmd->iou_rc);
-		clear_bit(drv_cmd->dev_handle, mrioc->removepend_bitmap);
+		if (drv_cmd->dev_handle < mrioc->facts.max_devhandle)
+			clear_bit(drv_cmd->dev_handle, mrioc->removepend_bitmap);
 	}
 
 	if (!list_empty(&mrioc->delayed_rmhs_list)) {
@@ -2557,11 +2637,28 @@ static void mpi3mr_dev_rmhs_send_tm(struct mpi3mr_ioc *mrioc, u16 handle,
 	struct mpi3mr_tgt_dev *tgtdev = NULL;
 	unsigned long flags;
 
+	if (handle >= mrioc->facts.max_devhandle) {
+		ioc_err(mrioc, "dev_remove_hs: handle(0x%04x) >= max_devhandle(0x%04x)\n",
+		    handle, mrioc->facts.max_devhandle);
+		if (drv_cmd) {
+			cmd_idx = drv_cmd->host_tag - MPI3MR_HOSTTAG_DEVRMCMD_MIN;
+			drv_cmd->state = MPI3MR_CMD_NOTUSED;
+			drv_cmd->callback = NULL;
+			drv_cmd->dev_handle = MPI3MR_INVALID_DEV_HANDLE;
+			drv_cmd->retry_count = 0;
+			clear_bit(cmd_idx, mrioc->devrem_bitmap);
+		}
+		return;
+	}
+
 	spin_lock_irqsave(&mrioc->tgtdev_lock, flags);
 	tgtdev = __mpi3mr_get_tgtdev_by_handle(mrioc, handle);
 	if (tgtdev && (iou_rc == MPI3_CTRL_OP_REMOVE_DEVICE))
 		tgtdev->state = MPI3MR_DEV_REMOVE_HS_STARTED;
 	spin_unlock_irqrestore(&mrioc->tgtdev_lock, flags);
+
+	if (tgtdev)
+		mpi3mr_tgtdev_put(tgtdev);
 
 	if (drv_cmd) {
 		ioc_info(mrioc,
@@ -2615,6 +2712,7 @@ issue_cmd:
 	drv_cmd->callback = mpi3mr_dev_rmhs_complete_tm;
 	drv_cmd->dev_handle = handle;
 	drv_cmd->iou_rc = iou_rc;
+
 	tm_req.dev_handle = cpu_to_le16(handle);
 	tm_req.task_type = MPI3_SCSITASKMGMT_TASKTYPE_TARGET_RESET;
 	tm_req.host_tag = cpu_to_le16(drv_cmd->host_tag);
@@ -2792,18 +2890,38 @@ out_failed:
  * removal handshake with reason as remove with the firmware for
  * PCIe devices.
  *
- * Return: Nothing
+ * Return: true if event is valid and should be queued to bottom-half,
+ *         false if event data is malformed and must be discarded.
  */
-static void mpi3mr_pcietopochg_evt_th(struct mpi3mr_ioc *mrioc,
+static bool mpi3mr_pcietopochg_evt_th(struct mpi3mr_ioc *mrioc,
 	struct mpi3_event_notification_reply *event_reply)
 {
 	struct mpi3_event_data_pcie_topology_change_list *topo_evt =
 	    (struct mpi3_event_data_pcie_topology_change_list *) event_reply->event_data;
 	int i;
 	u16 handle;
-	u8 reason_code;
+	u8 reason_code, max_entries;
+	u32 avail_data_len;
 	struct mpi3mr_tgt_dev *tgtdev = NULL;
 	struct mpi3mr_stgt_priv_data *scsi_tgt_priv_data = NULL;
+
+	avail_data_len = min_t(u32, (u32)(event_reply->event_data_length * 4),
+	    mrioc->reply_sz - offsetof(struct mpi3_event_notification_reply, event_data));
+	if (avail_data_len <
+	    offsetof(struct mpi3_event_data_pcie_topology_change_list,
+	    port_entry)) {
+		ioc_err(mrioc,
+		    "PCIe topology event: event_data_length too small\n");
+		return false;
+	}
+	max_entries = (avail_data_len -
+		      offsetof(struct mpi3_event_data_pcie_topology_change_list, port_entry)) /
+		      sizeof(struct mpi3_event_pcie_topo_port_entry);
+	if (topo_evt->num_entries > max_entries) {
+		ioc_err(mrioc, "PCIe topology event: num_entries(%d) exceeds max(%d)\n",
+		    topo_evt->num_entries, max_entries);
+		return false;
+	}
 
 	for (i = 0; i < topo_evt->num_entries; i++) {
 		handle = le16_to_cpu(topo_evt->port_entry[i].attached_dev_handle);
@@ -2846,6 +2964,7 @@ static void mpi3mr_pcietopochg_evt_th(struct mpi3mr_ioc *mrioc,
 		if (tgtdev)
 			mpi3mr_tgtdev_put(tgtdev);
 	}
+	return true;
 }
 
 /**
@@ -2858,9 +2977,10 @@ static void mpi3mr_pcietopochg_evt_th(struct mpi3mr_ioc *mrioc,
  * removal handshake with reason as remove with the firmware for
  * SAS/SATA devices.
  *
- * Return: Nothing
+ * Return: true if event is valid and should be queued to bottom-half,
+ *         false if event data is malformed and must be discarded.
  */
-static void mpi3mr_sastopochg_evt_th(struct mpi3mr_ioc *mrioc,
+static bool mpi3mr_sastopochg_evt_th(struct mpi3mr_ioc *mrioc,
 	struct mpi3_event_notification_reply *event_reply)
 {
 	struct mpi3_event_data_sas_topology_change_list *topo_evt =
@@ -2868,9 +2988,28 @@ static void mpi3mr_sastopochg_evt_th(struct mpi3mr_ioc *mrioc,
 	    event_reply->event_data;
 	int i;
 	u16 handle;
-	u8 reason_code;
+	u8 reason_code, max_entries;
+	u32 avail_data_len;
 	struct mpi3mr_tgt_dev *tgtdev = NULL;
 	struct mpi3mr_stgt_priv_data *scsi_tgt_priv_data = NULL;
+
+	avail_data_len = min_t(u32, (u32)(event_reply->event_data_length * 4),
+	    mrioc->reply_sz - offsetof(struct mpi3_event_notification_reply, event_data));
+	if (avail_data_len <
+	    offsetof(struct mpi3_event_data_sas_topology_change_list,
+	    phy_entry)) {
+		ioc_err(mrioc,
+		    "SAS topology event: event_data_length too small\n");
+		return false;
+	}
+	max_entries = (avail_data_len -
+		      offsetof(struct mpi3_event_data_sas_topology_change_list, phy_entry)) /
+		      sizeof(struct mpi3_event_sas_topo_phy_entry);
+	if (topo_evt->num_entries > max_entries) {
+		ioc_err(mrioc, "SAS topology event: num_entries(%d) exceeds max(%d)\n",
+		    topo_evt->num_entries, max_entries);
+		return false;
+	}
 
 	for (i = 0; i < topo_evt->num_entries; i++) {
 		handle = le16_to_cpu(topo_evt->phy_entry[i].attached_dev_handle);
@@ -2913,7 +3052,7 @@ static void mpi3mr_sastopochg_evt_th(struct mpi3mr_ioc *mrioc,
 		if (tgtdev)
 			mpi3mr_tgtdev_put(tgtdev);
 	}
-
+	return true;
 }
 
 /**
@@ -3184,14 +3323,14 @@ void mpi3mr_os_handle_events(struct mpi3mr_ioc *mrioc,
 	}
 	case MPI3_EVENT_SAS_TOPOLOGY_CHANGE_LIST:
 	{
-		process_event_bh = 1;
-		mpi3mr_sastopochg_evt_th(mrioc, event_reply);
+		if (mpi3mr_sastopochg_evt_th(mrioc, event_reply))
+			process_event_bh = 1;
 		break;
 	}
 	case MPI3_EVENT_PCIE_TOPOLOGY_CHANGE_LIST:
 	{
-		process_event_bh = 1;
-		mpi3mr_pcietopochg_evt_th(mrioc, event_reply);
+		if (mpi3mr_pcietopochg_evt_th(mrioc, event_reply))
+			process_event_bh = 1;
 		break;
 	}
 	case MPI3_EVENT_PREPARE_FOR_RESET:
@@ -3207,7 +3346,8 @@ void mpi3mr_os_handle_events(struct mpi3mr_ioc *mrioc,
 	}
 	case MPI3_EVENT_LOG_DATA:
 	{
-		sz = event_reply->event_data_length * 4;
+		sz = min_t(u16, event_reply->event_data_length * 4,
+			   mrioc->reply_sz - offsetof(struct mpi3_event_notification_reply, event_data));
 		mpi3mr_app_save_logdata_th(mrioc,
 		    (char*)event_reply->event_data, sz);
 		break;
@@ -3242,7 +3382,8 @@ void mpi3mr_os_handle_events(struct mpi3mr_ioc *mrioc,
 		dprint_event_th(mrioc,
 		    "scheduling bottom half handler for event(0x%02x)-(0x%08x), ack_required=%d\n",
 		    evt_type, le32_to_cpu(event_reply->event_context), ack_req);
-		sz = event_reply->event_data_length * 4;
+		sz = min_t(u16, event_reply->event_data_length * 4,
+			   mrioc->reply_sz - offsetof(struct mpi3_event_notification_reply, event_data));
 		fwevt = mpi3mr_alloc_fwevt(sz);
 		if (!fwevt)
 		{
@@ -3660,7 +3801,8 @@ void mpi3mr_process_op_reply_desc(struct mpi3mr_ioc *mrioc,
 			ioc_err(mrioc,
 			    "controller cannot transfer sense data due to empty sense buffer queue\n");
 		if (sense_buf) {
-			scsi_normalize_sense(sense_buf, sense_count, &sshdr);
+			scsi_normalize_sense(sense_buf,
+			    min_t(u32, sense_count, MPI3MR_SENSE_BUF_SZ), &sshdr);
 			mpi3mr_scsisense_trigger(mrioc, sshdr.sense_key,
 			    sshdr.asc, sshdr.ascq);
 		}
@@ -4393,10 +4535,18 @@ int mpi3mr_issue_tm(struct mpi3mr_ioc *mrioc, u8 tm_type,
 out_unlock:
 	drv_cmd->state = MPI3MR_CMD_NOTUSED;
 	mutex_unlock(&drv_cmd->mutex);
-	if (scsi_tgt_priv_data)
-		atomic_dec_if_positive(&scsi_tgt_priv_data->block_io);
-	if (tgtdev)
+	if (tgtdev) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&mrioc->tgtdev_lock, flags);
+		if (tgtdev->starget && tgtdev->starget->hostdata) {
+			scsi_tgt_priv_data = tgtdev->starget->hostdata;
+			atomic_dec_if_positive(
+			    &scsi_tgt_priv_data->block_io);
+		}
+		spin_unlock_irqrestore(&mrioc->tgtdev_lock, flags);
 		mpi3mr_tgtdev_put(tgtdev);
+	}
 out:
 	return retval;
 }
@@ -4412,8 +4562,13 @@ out:
  *
  * Return: 0 always
  */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0))
+static int mpi3mr_bios_param(struct scsi_device *sdev,
+	struct gendisk *unused, sector_t capacity, int params[])
+#else
 static int mpi3mr_bios_param(struct scsi_device *sdev,
 	struct block_device *bdev, sector_t capacity, int params[])
+#endif
 {
 	int heads;
 	int sectors;
@@ -5294,8 +5449,11 @@ static int mpi3mr_target_alloc(struct scsi_target *starget)
 			if (tgt_dev->dev_type == MPI3_DEVICE_DEVFORM_VD)
 				scsi_tgt_priv_data->throttle_group =
 				tgt_dev->dev_spec.vd_inf.tg;
-		} else
+		} else {
+			if (tgt_dev)
+				mpi3mr_tgtdev_put(tgt_dev);
 			retval = -ENXIO;
+		}
 	} else if (mrioc->sas_transport_enabled && !starget->channel) {
 		rphy = dev_to_rphy(starget->dev.parent);
 		tgt_dev = __mpi3mr_get_tgtdev_by_addr_and_rphy(mrioc,
@@ -5314,8 +5472,11 @@ static int mpi3mr_target_alloc(struct scsi_target *starget)
 			tgt_dev->starget = starget;
 			atomic_set(&scsi_tgt_priv_data->block_io, 0);
 			retval = 0;
-		} else
+		} else {
+			if (tgt_dev)
+				mpi3mr_tgtdev_put(tgt_dev);
 			retval = -ENXIO;
+		}
 	}
 	spin_unlock_irqrestore(&mrioc->tgtdev_lock, flags);
 	return retval;
@@ -5449,8 +5610,13 @@ inline bool mpi3mr_allow_scmd_to_fw(struct scsi_cmnd *scmd)
  *         SCSI_MLQUEUE_DEVICE_BUSY when the device is busy.
  *         SCSI_MLQUEUE_HOST_BUSY when the host queue is full.
  */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0))
+static enum scsi_qc_status mpi3mr_qcmd(struct Scsi_Host *shost,
+	struct scsi_cmnd *scmd)
+#else
 static int mpi3mr_qcmd(struct Scsi_Host *shost,
 	struct scsi_cmnd *scmd)
+#endif
 {
 	struct mpi3mr_ioc *mrioc = shost_priv(shost);
 	struct mpi3mr_stgt_priv_data *stgt_priv_data;
@@ -6143,6 +6309,8 @@ static void mpi3mr_remove(struct pci_dev *pdev)
 	if (mpi3mr_get_shost_and_mrioc(pdev, &shost, &mrioc))
 		return;
 
+	mrioc->is_unload = true;
+
 	while (mrioc->reset_in_progress || mrioc->is_driver_loading)
 		ssleep(1);
 	if (mrioc->block_on_pcie_err) {
@@ -6542,6 +6710,14 @@ static const struct pci_device_id mpi3mr_pci_id_table[] = {
 	{
 		PCI_DEVICE_SUB(MPI3_MFGPAGE_VENDORID_BROADCOM,
 		    MPI3_MFGPAGE_DEVID_SAS5116_MPI_NS, PCI_ANY_ID, PCI_ANY_ID)
+	},
+	{
+		PCI_DEVICE_SUB(MPI3_MFGPAGE_VENDORID_BROADCOM,
+		    MPI3_MFGPAGE_DEVID_SAS5248_MPI, PCI_ANY_ID, PCI_ANY_ID)
+	},
+	{
+		PCI_DEVICE_SUB(MPI3_MFGPAGE_VENDORID_BROADCOM,
+		    MPI3_MFGPAGE_DEVID_SAS5248_MPI_NS, PCI_ANY_ID, PCI_ANY_ID)
 	},
 	{ 0 }
 };
