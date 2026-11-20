@@ -334,7 +334,7 @@ struct mpi3_event_notification_reply {
 	u8                 event;
 	__le16             ioc_change_count;
 	__le32             event_context;
-	__le32             event_data[1];
+	__le32             event_data[];
 };
 #define MPI3_EVENT_NOTIFY_MSGFLAGS_ACK_MASK                        (0x01)
 #define MPI3_EVENT_NOTIFY_MSGFLAGS_ACK_SHIFT                       (0)
@@ -420,10 +420,10 @@ struct mpi3_event_data_sas_discovery {
 #define MPI3_EVENT_SAS_DISC_FLAGS_IN_PROGRESS                   (0x01)
 #define MPI3_EVENT_SAS_DISC_RC_STARTED                          (0x01)
 #define MPI3_EVENT_SAS_DISC_RC_COMPLETED                        (0x02)
-#define MPI3_SAS_DISC_STATUS_MAX_ENCLOSURES_EXCEED            (0x80000000)
-#define MPI3_SAS_DISC_STATUS_MAX_EXPANDERS_EXCEED             (0x40000000)
-#define MPI3_SAS_DISC_STATUS_MAX_DEVICES_EXCEED               (0x20000000)
-#define MPI3_SAS_DISC_STATUS_MAX_TOPO_PHYS_EXCEED             (0x10000000)
+#define MPI3_SAS_DISC_STATUS_MAX_ENCLOSURES_EXCEEDED          (0x80000000)
+#define MPI3_SAS_DISC_STATUS_MAX_EXPANDERS_EXCEEDED           (0x40000000)
+#define MPI3_SAS_DISC_STATUS_MAX_DEVICES_EXCEEDED             (0x20000000)
+#define MPI3_SAS_DISC_STATUS_MAX_TOPO_PHYS_EXCEEDED           (0x10000000)
 #define MPI3_SAS_DISC_STATUS_INVALID_CEI                      (0x00010000)
 #define MPI3_SAS_DISC_STATUS_FECEI_MISMATCH                   (0x00008000)
 #define MPI3_SAS_DISC_STATUS_MULTIPLE_DEVICES_IN_SLOT         (0x00004000)
@@ -465,9 +465,6 @@ struct mpi3_event_data_sas_notify_primitive {
 #define MPI3_EVENT_NOTIFY_PRIMITIVE_POWER_LOSS_EXPECTED   (0x02)
 #define MPI3_EVENT_NOTIFY_PRIMITIVE_RESERVED1             (0x03)
 #define MPI3_EVENT_NOTIFY_PRIMITIVE_RESERVED2             (0x04)
-#ifndef MPI3_EVENT_SAS_TOPO_PHY_COUNT
-#define MPI3_EVENT_SAS_TOPO_PHY_COUNT           (1)
-#endif
 struct mpi3_event_sas_topo_phy_entry {
 	__le16             attached_dev_handle;
 	u8                 link_rate;
@@ -508,7 +505,7 @@ struct mpi3_event_data_sas_topology_change_list {
 	u8                                 start_phy_num;
 	u8                                 exp_status;
 	u8                                 io_unit_port;
-	struct mpi3_event_sas_topo_phy_entry   phy_entry[MPI3_EVENT_SAS_TOPO_PHY_COUNT];
+	struct mpi3_event_sas_topo_phy_entry   phy_entry[];
 };
 #define MPI3_EVENT_SAS_TOPO_ES_NO_EXPANDER              (0x00)
 #define MPI3_EVENT_SAS_TOPO_ES_NOT_RESPONDING           (0x02)
@@ -553,9 +550,6 @@ struct mpi3_event_data_pcie_enumeration {
 #define MPI3_EVENT_PCIE_ENUM_ES_MAX_SWITCHES_EXCEED         (0x40000000)
 #define MPI3_EVENT_PCIE_ENUM_ES_MAX_DEVICES_EXCEED          (0x20000000)
 #define MPI3_EVENT_PCIE_ENUM_ES_RESOURCES_EXHAUSTED         (0x10000000)
-#ifndef MPI3_EVENT_PCIE_TOPO_PORT_COUNT
-#define MPI3_EVENT_PCIE_TOPO_PORT_COUNT         (1)
-#endif
 struct mpi3_event_pcie_topo_port_entry {
 	__le16             attached_dev_handle;
 	u8                 port_status;
@@ -597,7 +591,7 @@ struct mpi3_event_data_pcie_topology_change_list {
 	u8                                     switch_status;
 	u8                                     io_unit_port;
 	__le32                                 reserved0c;
-	struct mpi3_event_pcie_topo_port_entry     port_entry[MPI3_EVENT_PCIE_TOPO_PORT_COUNT];
+	struct mpi3_event_pcie_topo_port_entry     port_entry[];
 };
 #define MPI3_EVENT_PCIE_TOPO_SS_NO_PCIE_SWITCH          (0x00)
 #define MPI3_EVENT_PCIE_TOPO_SS_NOT_RESPONDING          (0x02)
@@ -932,7 +926,7 @@ struct mpi3_ci_download_reply {
 	u8                                 flags;
 	u8                                 cache_dirty;
 	u8                                 pending_count;
-	u8                                 reserved13;
+	u8                                 additional_flags;
 };
 #define MPI3_CI_DOWNLOAD_FLAGS_DOWNLOAD_IN_PROGRESS                  (0x80)
 #define MPI3_CI_DOWNLOAD_FLAGS_ACTIVATION_FAILURE                    (0x40)
@@ -945,6 +939,11 @@ struct mpi3_ci_download_reply {
 #define MPI3_CI_DOWNLOAD_FLAGS_ACTIVATION_STATUS_ONLINE_PENDING      (0x04)
 #define MPI3_CI_DOWNLOAD_FLAGS_ACTIVATION_STATUS_OFFLINE_PENDING     (0x06)
 #define MPI3_CI_DOWNLOAD_FLAGS_COMPATIBLE                            (0x01)
+#define MPI3_CI_DOWNLOAD_ADDITIONALFLAGS_REDUNDANCYRESTORATION_MASK       (0x03)
+#define MPI3_CI_DOWNLOAD_ADDITIONALFLAGS_REDUNDANCYRESTORATION_SHIFT      (0)
+#define MPI3_CI_DOWNLOAD_ADDITIONALFLAGS_REDUNDANCYRESTORATION_NONE       (0x00)
+#define MPI3_CI_DOWNLOAD_ADDITIONALFLAGS_REDUNDANCYRESTORATION_PRIMARY    (0x01)
+#define MPI3_CI_DOWNLOAD_ADDITIONALFLAGS_REDUNDANCYRESTORATION_SECONDARY  (0x02)
 struct mpi3_ci_upload_request {
 	__le16                             host_tag;
 	u8                                 ioc_use_only02;

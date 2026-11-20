@@ -80,8 +80,8 @@ extern spinlock_t mrioc_list_lock;
 extern struct list_head mrioc_list;
 extern atomic64_t event_counter;
 
-#define MPI3MR_DRIVER_VERSION	"8.17.1.0.0"
-#define MPI3MR_DRIVER_RELDATE	"07-April-2026"
+#define MPI3MR_DRIVER_VERSION	"8.19.1.0.0"
+#define MPI3MR_DRIVER_RELDATE	"19-October-2026"
 
 
 #define MPI3MR_DRIVER_NAME	"mpi3mr"
@@ -159,6 +159,7 @@ extern atomic64_t event_counter;
 #define MPI3MR_RESETTM_TIMEOUT			60
 
 #define MPI3MR_TSUPDATE_INTERVAL		900
+#define MPI3MR_EARLY_TSUPDATE_SECONDS		60	/* early time sync 1 min after load/reset */
 #define MPI3MR_DEFAULT_SHUTDOWN_TIME		120
 #define	MPI3MR_RAID_ERRREC_RESET_TIMEOUT	180
 #define	MPI3MR_RESET_HOST_IOWAIT_TIMEOUT	5
@@ -197,6 +198,13 @@ extern atomic64_t event_counter;
 
 #define MPI3MR_DEFAULT_MDTS		(128 * 1024)
 #define MPI3MR_DEFAULT_PGSZEXP		(12)
+/*
+ * Maximum NVMe page-size exponent we accept from firmware Device
+ * Page 0. 1 << 24 == 16 MiB which is well above any real NVMe page
+ * size and keeps (1U << pgsz) safely within u32 / size_t range on
+ * all supported architectures.
+ */
+#define MPI3MR_MAX_PGSZEXP		(24)
 #define MPI3MR_MAX_APP_XFER_SIZE	(1 * 1024 * 1024)
 #define MPI3MR_MAX_APP_XFER_SECTORS	(2048 + 512)
 #define MPI3MR_MAX_APP_XFER_SEGMENTS	512
@@ -1107,6 +1115,7 @@ struct mpi3mr_pdevinfo {
  * @cfg_cmds: Command tracker for configuration requests
  * @facts: Cached IOC facts data
  * @op_reply_desc_sz: Operational reply descriptor size
+ * @op_req_sz: Cached operational request entry size in use
  * @num_reply_bufs: Number of reply buffers allocated
  * @reply_buf_pool: Reply buffer pool
  * @reply_buf: Reply buffer base virtual address
@@ -1167,6 +1176,7 @@ struct mpi3mr_pdevinfo {
  * @evtack_cmds_bitmap: Event Ack bitmap
  * @delayed_evtack_cmds_list: Delayed event acknowledgment list
  * @ts_update_counter: Timestamp update counter
+ * @early_ts_sync_done: Early (1 min) timestamp sync completed after load/reset
  * @ts_update_interval: Timestamp update interval
  * @reset_in_progress: Reset in progress flag
  * @unrecoverable: Controller unrecoverable flag
@@ -1316,6 +1326,7 @@ struct mpi3mr_ioc {
 	struct mpi3mr_drv_cmd cfg_cmds;
 	struct mpi3mr_ioc_facts facts;
 	u16 op_reply_desc_sz;
+	u16 op_req_sz;
 
 	u32 num_reply_bufs;
 	struct dma_pool *reply_buf_pool;
@@ -1323,7 +1334,7 @@ struct mpi3mr_ioc {
 	dma_addr_t reply_buf_dma;
 	dma_addr_t reply_buf_dma_max_address;
 
-	u16 reply_free_qsz;
+	u32 reply_free_qsz;
 	u16 reply_sz;
 	struct dma_pool *reply_free_q_pool;
 	__le64 *reply_free_q;
@@ -1390,6 +1401,7 @@ struct mpi3mr_ioc {
 	struct list_head delayed_evtack_cmds_list;
 
 	u16 ts_update_counter;
+	u8 early_ts_sync_done;
 	u16 ts_update_interval;
 
 	u8 reset_in_progress;
@@ -1512,6 +1524,8 @@ struct mpi3mr_ioc {
 	struct dma_pool *trace_buf_pool;
 	struct segments *trace_buf;
 	u8 invalid_io_comp;
+	bool skip_dev_shutdown_on_unload;
+	bool is_unload;
 };
 
 int mpi3mr_setup_resources(struct mpi3mr_ioc *mrioc);
