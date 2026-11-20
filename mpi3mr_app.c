@@ -3231,8 +3231,7 @@ static void mpi3mr_bsg_queue_creation(struct mpi3mr_ioc *mrioc,
 
 	mrioc->bsg_queue = bsg_setup_queue(bsg_dev, dev_name(bsg_dev), &lim,
 	    mpi3mr_bsg_request, NULL, 0
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(7, 2, 13)) || \
-	 ((LINUX_VERSION_MAJOR == 6) && (LINUX_VERSION_PATCHLEVEL == 12) && (LINUX_VERSION_SUBLEVEL >= 115)))
+#ifdef MPI3MR_BSG_SETUP_QUEUE_HAS_REPLY_LEN
 		, SCSI_SENSE_BUFFERSIZE
 #endif
 	);
