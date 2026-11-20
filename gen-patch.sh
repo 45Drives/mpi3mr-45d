@@ -13,6 +13,8 @@ echo Generating patch...
 # 45Drives MPI3MR Driver Patch
 # -----------------------------------------------------------------------------
 # - Adds `slot` attribute to block devices for easier drive aliasing
+# - Fixes kernel compat issues
+#   - bsg_setup_queue() api change to add reply_len parameter
 #
 EOF
   git diff upstream "$PATCHED_BRANCH" -p
