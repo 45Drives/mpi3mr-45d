@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+{
+    command -v apt && apt update -y && apt upgrade -y
+    command -v dnf && dnf upgrade -y
+} > /dev/null 2>&1
+
 kernels=()
 
 # RHEL/Rocky layout
