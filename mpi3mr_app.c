@@ -4028,6 +4028,38 @@ persistent_id_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(persistent_id);
 
+/**
+ * slot_show - SysFS callback for slot number display
+ * @dev: class device
+ * @attr: Device attributes
+ * @buf: Buffer to copy
+ *
+ * Return: snprintf() return after copying slot number
+ * of the specific device.
+ */
+static ssize_t
+slot_show(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct mpi3mr_sdev_priv_data *sdev_priv_data;
+	struct mpi3mr_stgt_priv_data *tgt_priv_data;
+	struct mpi3mr_tgt_dev *tgtdev;
+
+	sdev_priv_data = sdev->hostdata;
+	if (!sdev_priv_data)
+		return 0;
+
+	tgt_priv_data = sdev_priv_data->tgt_priv_data;
+	if (!tgt_priv_data)
+		return 0;
+	tgtdev = tgt_priv_data->tgt_dev;
+	if (!tgtdev)
+		return 0;
+	return snprintf(buf, PAGE_SIZE, "%u\n", tgtdev->slot);
+}
+static DEVICE_ATTR_RO(slot);
+
 #if ((KERNEL_VERSION(5, 16, 0) <= LINUX_VERSION_CODE) || \
 	(defined(CONFIG_SUSE_KERNEL) && \
 	((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
@@ -4036,6 +4068,7 @@ static struct attribute *mpi3mr_dev_attrs[] = {
 	&dev_attr_sas_address.attr,
 	&dev_attr_device_handle.attr,
 	&dev_attr_persistent_id.attr,
+	&dev_attr_slot.attr,
 	NULL,
 };
 
@@ -4055,6 +4088,7 @@ struct device_attribute *mpi3mr_dev_attrs[] = {
 	&dev_attr_sas_address,
 	&dev_attr_device_handle,
 	&dev_attr_persistent_id,
+	&dev_attr_slot,
 	NULL,
 };
 
