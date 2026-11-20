@@ -1,33 +1,25 @@
+# 45Drives MPI3MR Driver Patch
+# -----------------------------------------------------------------------------
+# - Adds `slot` attribute to block devices for easier drive aliasing
+#
 diff --git a/mpi3mr.h b/mpi3mr.h
-index 9bf3c05..1921dda 100755
+index d160999..6efd0f4 100644
 --- a/mpi3mr.h
 +++ b/mpi3mr.h
-@@ -64,6 +64,11 @@
- #include <scsi/scsi_dbg.h>
- #include <scsi/scsi_transport_sas.h>
- 
-+#ifndef SCSI_VPD_PG_LEN
-+// No idea why, but Rocky 8's version of kernel 4.18.0 does not define this in scsi/scsi_device.h
-+#define SCSI_VPD_PG_LEN 255
-+#endif
-+
- #include "mpi/mpi30_transport.h"
- #include "mpi/mpi30_cnfg.h"
- #include "mpi/mpi30_image.h"
-@@ -80,7 +85,7 @@ extern spinlock_t mrioc_list_lock;
+@@ -80,7 +80,7 @@ extern spinlock_t mrioc_list_lock;
  extern struct list_head mrioc_list;
  extern atomic64_t event_counter;
  
--#define MPI3MR_DRIVER_VERSION	"8.17.1.0.0"
-+#define MPI3MR_DRIVER_VERSION	"8.17.1.0.0-45d3"
- #define MPI3MR_DRIVER_RELDATE	"07-April-2026"
+-#define MPI3MR_DRIVER_VERSION	"8.19.1.0.0"
++#define MPI3MR_DRIVER_VERSION	"8.19.1.0.0-45d1"
+ #define MPI3MR_DRIVER_RELDATE	"19-October-2026"
  
  
 diff --git a/mpi3mr_app.c b/mpi3mr_app.c
-index 495470e..05ece6e 100755
+index 3349f9e..0dcc632 100644
 --- a/mpi3mr_app.c
 +++ b/mpi3mr_app.c
-@@ -3970,6 +3970,38 @@ persistent_id_show(struct device *dev, struct device_attribute *attr,
+@@ -4028,6 +4028,38 @@ persistent_id_show(struct device *dev, struct device_attribute *attr,
  }
  static DEVICE_ATTR_RO(persistent_id);
  
@@ -66,7 +58,7 @@ index 495470e..05ece6e 100755
  #if ((KERNEL_VERSION(5, 16, 0) <= LINUX_VERSION_CODE) || \
  	(defined(CONFIG_SUSE_KERNEL) && \
  	((CONFIG_SUSE_VERSION == 15) && (CONFIG_SUSE_PATCHLEVEL >= 5))))
-@@ -3978,6 +4010,7 @@ static struct attribute *mpi3mr_dev_attrs[] = {
+@@ -4036,6 +4068,7 @@ static struct attribute *mpi3mr_dev_attrs[] = {
  	&dev_attr_sas_address.attr,
  	&dev_attr_device_handle.attr,
  	&dev_attr_persistent_id.attr,
@@ -74,7 +66,7 @@ index 495470e..05ece6e 100755
  	NULL,
  };
  
-@@ -3997,8 +4030,8 @@ struct device_attribute *mpi3mr_dev_attrs[] = {
+@@ -4055,6 +4088,7 @@ struct device_attribute *mpi3mr_dev_attrs[] = {
  	&dev_attr_sas_address,
  	&dev_attr_device_handle,
  	&dev_attr_persistent_id,
@@ -82,71 +74,3 @@ index 495470e..05ece6e 100755
  	NULL,
  };
  
- #endif
--
-diff --git a/mpi3mr_kernel_compat.h b/mpi3mr_kernel_compat.h
-index 611a6a4..b3223db 100755
---- a/mpi3mr_kernel_compat.h
-+++ b/mpi3mr_kernel_compat.h
-@@ -143,6 +143,18 @@ static inline void mpi3mr_scsi_build_sense(struct scsi_cmnd *scmd,
- #define fallthrough
- #endif
- 
-+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)) || \
-+    (defined(RHEL_MAJOR) && (RHEL_MAJOR == 9 && RHEL_MINOR >= 4)))
-+static inline int pci_enable_pcie_error_reporting(struct pci_dev *dev)
-+{
-+    return -EINVAL;
-+}
-+static inline int pci_disable_pcie_error_reporting(struct pci_dev *dev)
-+{
-+    return -EINVAL;
-+}
-+#endif
-+
- #if ((LINUX_VERSION_CODE >= KERNEL_VERSION(5,0,0)) || \
-       defined(RHEL_MAJOR))
-     #define SETUP_QUEUE_ARG NULL, 0
-@@ -162,3 +174,20 @@ static inline void mpi3mr_scsi_build_sense(struct scsi_cmnd *scmd,
- #define MPI3MR_MAX_PAGE_ORDER 10
- #endif
- 
-+/* Kernel 6.13+ changed bios_param to take struct gendisk * instead of
-+ * struct block_device *
-+ */
-+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
-+#define MPI3MR_BIOS_PARAM_DISK_TYPE struct gendisk
-+#else
-+#define MPI3MR_BIOS_PARAM_DISK_TYPE struct block_device
-+#endif
-+
-+/* Kernel 6.13+ changed queuecommand return type from int to
-+ * enum scsi_qc_status
-+ */
-+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
-+#define MPI3MR_QCMD_RET_TYPE enum scsi_qc_status
-+#else
-+#define MPI3MR_QCMD_RET_TYPE int
-+#endif
-diff --git a/mpi3mr_os.c b/mpi3mr_os.c
-index 5673175..ffebff7 100755
---- a/mpi3mr_os.c
-+++ b/mpi3mr_os.c
-@@ -4413,7 +4413,7 @@ out:
-  * Return: 0 always
-  */
- static int mpi3mr_bios_param(struct scsi_device *sdev,
--	struct block_device *bdev, sector_t capacity, int params[])
-+	MPI3MR_BIOS_PARAM_DISK_TYPE *bdev, sector_t capacity, int params[])
- {
- 	int heads;
- 	int sectors;
-@@ -5449,7 +5449,7 @@ inline bool mpi3mr_allow_scmd_to_fw(struct scsi_cmnd *scmd)
-  *         SCSI_MLQUEUE_DEVICE_BUSY when the device is busy.
-  *         SCSI_MLQUEUE_HOST_BUSY when the host queue is full.
-  */
--static int mpi3mr_qcmd(struct Scsi_Host *shost,
-+static MPI3MR_QCMD_RET_TYPE mpi3mr_qcmd(struct Scsi_Host *shost,
- 	struct scsi_cmnd *scmd)
- {
- 	struct mpi3mr_ioc *mrioc = shost_priv(shost);

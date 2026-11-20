@@ -1,3 +1,9 @@
+mpi3mr-dkms (8.19.1.0.0-45d1trixie) trixie; urgency=medium
+
+  * Update upstream driver to 8.19.1.0.0
+
+ -- Joshua Boudreau <jboudreau@45drives.com>  Fri, 20 Nov 2026 09:31:16 -0400
+
 mpi3mr-dkms (8.17.1.0.0-45d3trixie) trixie; urgency=medium
 
   * Fixes the mpi3mr driver build failure on Proxmox VE 9 (Trixie) with kernel 7.0.14-4-pve

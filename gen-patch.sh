@@ -8,7 +8,15 @@ mkdir -p patches
 
 echo Generating patch...
 
-git diff upstream "$PATCHED_BRANCH" -p | tee patches/45drives.patch
+{
+  cat << 'EOF'
+# 45Drives MPI3MR Driver Patch
+# -----------------------------------------------------------------------------
+# - Adds `slot` attribute to block devices for easier drive aliasing
+#
+EOF
+  git diff upstream "$PATCHED_BRANCH" -p
+} | tee patches/45drives.patch
 
 echo Updating dkms.conf...
 
