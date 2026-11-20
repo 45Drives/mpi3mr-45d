@@ -3230,7 +3230,12 @@ static void mpi3mr_bsg_queue_creation(struct mpi3mr_ioc *mrioc,
 	};
 
 	mrioc->bsg_queue = bsg_setup_queue(bsg_dev, dev_name(bsg_dev), &lim,
-	    mpi3mr_bsg_request, NULL, 0);
+	    mpi3mr_bsg_request, NULL, 0
+#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(7, 2, 13)) || \
+	 ((LINUX_VERSION_MAJOR == 6) && (LINUX_VERSION_PATCHLEVEL == 12) && (LINUX_VERSION_SUBLEVEL >= 115)))
+		, SCSI_SENSE_BUFFERSIZE
+#endif
+	);
 	if (IS_ERR(mrioc->bsg_queue)) {
 		ioc_err(mrioc, "%s: bsg registration failed\n",
 			dev_name(bsg_dev));
